@@ -2,25 +2,20 @@ import { getUnsyncedLogs, markLogsAsSynced } from '../database/database';
 import { API_URL } from '../constants';
 import { SensorLog } from '../types';
 
-/**
- * Syncs unsynchronized logs to the remote API.
- * Returns the number of logs successfully synced.
- */
+
 export async function syncLogsWithApi(): Promise<number> {
   try {
     const unsyncedLogs = await getUnsyncedLogs();
     
     if (unsyncedLogs.length === 0) {
-      return 0; // Nothing to sync
+      return 0; 
     }
 
-    // Attempt to send data to the API
     const response = await fetch(`${API_URL}/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      // Assuming your API expects { logs: SensorLog[] } or similar
       body: JSON.stringify(unsyncedLogs),
     });
 
@@ -28,7 +23,6 @@ export async function syncLogsWithApi(): Promise<number> {
       throw new Error(`API returned status ${response.status}`);
     }
 
-    // Assuming API is successful, mark these IDs as synced
     const syncedIds = unsyncedLogs.map(log => log.id).filter((id): id is number => id !== undefined);
     
     if (syncedIds.length > 0) {

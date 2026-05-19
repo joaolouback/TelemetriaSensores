@@ -9,22 +9,17 @@ interface UseDataCollectionOptions {
   onSaved?: () => void;
 }
 
-/**
- * Custom hook that handles timer-based batch saving of sensor data.
- * Saves a combined log entry every SAVE_INTERVAL_MS while active.
- */
+
 export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOptions) {
   const [status, setStatus] = useState<CollectionStatus>(CollectionStatus.IDLE);
   const [saveCount, setSaveCount] = useState(0);
   const saveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sensorStateRef = useRef<SensorState>(sensorState);
 
-  // Keep ref in sync with latest sensor state (avoids stale closures)
   useEffect(() => {
     sensorStateRef.current = sensorState;
   }, [sensorState]);
 
-  // Save current sensor data to SQLite
   const saveSensorData = useCallback(async () => {
     const current = sensorStateRef.current;
 
@@ -46,30 +41,25 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
       setSaveCount((prev) => prev + 1);
       onSaved?.();
 
-      // Attempt to sync logs with API after saving locally
       syncLogsWithApi().catch(console.error);
     } catch (error) {
       console.error('[useDataCollection] Save error:', error);
     }
   }, [onSaved]);
 
-  // Start data collection
   const startCollection = useCallback(() => {
     if (saveTimerRef.current) return;
 
     setStatus(CollectionStatus.COLLECTING);
     setSaveCount(0);
 
-    // Save immediately on start
     saveSensorData();
 
-    // Then save at interval
     saveTimerRef.current = setInterval(() => {
       saveSensorData();
     }, SAVE_INTERVAL_MS);
   }, [saveSensorData]);
 
-  // Stop data collection
   const stopCollection = useCallback(() => {
     if (saveTimerRef.current) {
       clearInterval(saveTimerRef.current);
@@ -78,7 +68,6 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
     setStatus(CollectionStatus.STOPPED);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {

@@ -1,6 +1,3 @@
-// ========================
-// Sensor Data Types
-// ========================
 
 export interface LocationData {
   latitude: number;
@@ -26,9 +23,6 @@ export interface ConnectivityData {
   isConnected: boolean;
 }
 
-// ========================
-// SQLite Record
-// ========================
 
 export interface SensorLog {
   id?: number;
@@ -41,13 +35,10 @@ export interface SensorLog {
   magnitude: number | null;
   battery_level: number | null;
   network_type: string | null;
-  synced: number; // 0 = not synced, 1 = synced
+  synced: number; 
   created_at: string;
 }
 
-// ========================
-// App State
-// ========================
 
 export enum CollectionStatus {
   IDLE = 'idle',
@@ -60,9 +51,7 @@ export interface StorageInfo {
   lastRecord: SensorLog | null;
 }
 
-// ========================
-// Sensor State (aggregated)
-// ========================
+
 
 export interface SensorState {
   location: LocationData | null;

@@ -10,9 +10,7 @@ interface ActionButtonProps {
   style?: ViewStyle;
 }
 
-/**
- * Styled action button for start/stop/clear operations.
- */
+
 export function ActionButton({
   label,
   onPress,

@@ -7,10 +7,7 @@ import {
   deleteAllLogs,
 } from '../database/database';
 
-/**
- * Custom hook to manage SQLite database state.
- * Handles initialization, record count, last record, and clearing.
- */
+
 export function useDatabase() {
   const [isReady, setIsReady] = useState(false);
   const [storageInfo, setStorageInfo] = useState<StorageInfo>({
@@ -19,7 +16,7 @@ export function useDatabase() {
   });
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize the database on mount
+ 
   useEffect(() => {
     let mounted = true;
 
@@ -45,7 +42,7 @@ export function useDatabase() {
     };
   }, []);
 
-  // Refresh record count and last record
+
   const refreshStorageInfo = useCallback(async () => {
     try {
       const [count, last] = await Promise.all([getLogCount(), getLastLog()]);
@@ -58,7 +55,7 @@ export function useDatabase() {
     }
   }, []);
 
-  // Clear all records
+  
   const clearDatabase = useCallback(async () => {
     try {
       await deleteAllLogs();

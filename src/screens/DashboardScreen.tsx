@@ -37,19 +37,16 @@ export function DashboardScreen() {
 
   const isCollecting = status === CollectionStatus.COLLECTING;
 
-  // Start both sensors and data collection
   const handleStart = useCallback(async () => {
     await startSensors();
     startCollection();
   }, [startSensors, startCollection]);
 
-  // Stop both sensors and data collection
   const handleStop = useCallback(() => {
     stopCollection();
     stopSensors();
   }, [stopCollection, stopSensors]);
 
-  // Clear the database with confirmation
   const handleClear = useCallback(() => {
     Alert.alert(
       'Limpar Dados',
@@ -79,7 +76,6 @@ export function DashboardScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Telemetria Sensores</Text>
         <StatusBadge
@@ -95,7 +91,6 @@ export function DashboardScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Location Card */}
         <SensorCard title="Localização" icon="📍" color={COLORS.gps} isActive={!!location}>
           <DataRow label="Latitude" value={formatNumber(location?.latitude, 6)} />
           <DataRow label="Longitude" value={formatNumber(location?.longitude, 6)} />
@@ -106,7 +101,6 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        {/* Accelerometer Card */}
         <SensorCard title="Acelerômetro" icon="📐" color={COLORS.accelerometer} isActive={!!accelerometer}>
           <DataRow label="Eixo X" value={formatNumber(accelerometer?.x)} color={COLORS.danger} />
           <DataRow label="Eixo Y" value={formatNumber(accelerometer?.y)} color={COLORS.success} />
@@ -118,7 +112,6 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        {/* Battery Card */}
         <SensorCard title="Bateria" icon="🔋" color={COLORS.battery} isActive={battery !== null}>
           <DataRow
             label="Nível"
@@ -138,7 +131,6 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        {/* Connectivity Card */}
         <SensorCard title="Conectividade" icon="📶" color={COLORS.connectivity} isActive={connectivity.isConnected}>
           <View style={styles.badgeRow}>
             <StatusBadge
@@ -164,7 +156,6 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        {/* Storage Card */}
         <SensorCard title="Armazenamento" icon="💾" color={COLORS.storage} isActive={storageInfo.recordCount > 0}>
           <DataRow
             label="Registros SQLite"
@@ -185,7 +176,6 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           {!isCollecting ? (
             <ActionButton
@@ -211,7 +201,7 @@ export function DashboardScreen() {
           />
         </View>
 
-        {/* Footer info */}
+        
         <Text style={styles.footer}>
           SensorTelemetryApp v1.0
         </Text>

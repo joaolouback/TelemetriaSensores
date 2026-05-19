@@ -16,10 +16,7 @@ const DEFAULT_CONNECTIVITY: ConnectivityData = {
   isConnected: false,
 };
 
-/**
- * Custom hook that manages all sensor subscriptions.
- * Provides start/stop lifecycle and current readings.
- */
+
 export function useSensors() {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [accelerometer, setAccelerometer] = useState<AccelerometerData | null>(null);
@@ -32,7 +29,6 @@ export function useSensors() {
     isRunning.current = true;
 
     try {
-      // Start location (async – needs permissions)
       await startLocationUpdates((data: LocationData) => {
         setLocation(data);
       });
@@ -40,17 +36,14 @@ export function useSensors() {
       console.warn('[useSensors] Location error:', error);
     }
 
-    // Start accelerometer
     startAccelerometer((data: AccelerometerData) => {
       setAccelerometer(data);
     });
 
-    // Start battery monitor
     startBatteryMonitor((data: BatteryData) => {
       setBattery(data);
     });
 
-    // Start connectivity monitor
     startConnectivityMonitor((data: ConnectivityData) => {
       setConnectivity(data);
     });
