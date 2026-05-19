@@ -11,9 +11,7 @@ interface SensorCardProps {
   style?: ViewStyle;
 }
 
-/**
- * Reusable card component for displaying sensor data.
- */
+
 export function SensorCard({
   title,
   color = COLORS.primary,
@@ -45,9 +43,7 @@ interface DataRowProps {
   color?: string;
 }
 
-/**
- * Single data row inside a SensorCard.
- */
+
 export function DataRow({ label, value, color }: DataRowProps) {
   return (
     <View style={styles.dataRow}>

@@ -9,9 +9,7 @@ interface StatusBadgeProps {
   inactiveColor?: string;
 }
 
-/**
- * Small colored badge for status indicators (online/offline, active/inactive).
- */
+
 export function StatusBadge({
   label,
   isActive,

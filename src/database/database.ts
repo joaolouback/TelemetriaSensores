@@ -4,9 +4,7 @@ import { SensorLog } from '../types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
-/**
- * Initialize the SQLite database and create the sensor_logs table.
- */
+
 export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
 
@@ -33,9 +31,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   return db;
 }
 
-/**
- * Get the database instance (must call initDatabase first).
- */
+
 export function getDatabase(): SQLite.SQLiteDatabase {
   if (!db) {
     throw new Error('Database not initialized. Call initDatabase() first.');
@@ -43,9 +39,7 @@ export function getDatabase(): SQLite.SQLiteDatabase {
   return db;
 }
 
-/**
- * Insert a sensor log record.
- */
+
 export async function insertSensorLog(log: Omit<SensorLog, 'id'>): Promise<number> {
   const database = getDatabase();
   const result = await database.runAsync(
@@ -69,9 +63,7 @@ export async function insertSensorLog(log: Omit<SensorLog, 'id'>): Promise<numbe
   return result.lastInsertRowId;
 }
 
-/**
- * Get the total count of sensor log records.
- */
+
 export async function getLogCount(): Promise<number> {
   const database = getDatabase();
   const result = await database.getFirstAsync<{ count: number }>(
@@ -80,9 +72,7 @@ export async function getLogCount(): Promise<number> {
   return result?.count ?? 0;
 }
 
-/**
- * Get the most recent sensor log record.
- */
+
 export async function getLastLog(): Promise<SensorLog | null> {
   const database = getDatabase();
   const result = await database.getFirstAsync<SensorLog>(
@@ -101,10 +91,27 @@ export async function getAllLogs(): Promise<SensorLog[]> {
   );
 }
 
-/**
- * Delete all sensor log records.
- */
+
 export async function deleteAllLogs(): Promise<void> {
   const database = getDatabase();
   await database.runAsync(`DELETE FROM ${TABLE_NAME}`);
+}
+
+
+export async function getUnsyncedLogs(): Promise<SensorLog[]> {
+  const database = getDatabase();
+  return await database.getAllAsync<SensorLog>(
+    `SELECT * FROM ${TABLE_NAME} WHERE synced = 0 ORDER BY id ASC`
+  );
+}
+
+
+export async function markLogsAsSynced(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const database = getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  await database.runAsync(
+    `UPDATE ${TABLE_NAME} SET synced = 1 WHERE id IN (${placeholders})`,
+    ids
+  );
 }

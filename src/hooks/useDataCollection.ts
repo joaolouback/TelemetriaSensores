@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { CollectionStatus, SensorState } from '../types';
 import { insertSensorLog } from '../database/database';
 import { SAVE_INTERVAL_MS, SENSOR_TYPES } from '../constants';
+import { syncLogsWithApi } from '../services/api';
 
 interface UseDataCollectionOptions {
   sensorState: SensorState;
@@ -44,6 +45,9 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
 
       setSaveCount((prev) => prev + 1);
       onSaved?.();
+
+      // Attempt to sync logs with API after saving locally
+      syncLogsWithApi().catch(console.error);
     } catch (error) {
       console.error('[useDataCollection] Save error:', error);
     }
