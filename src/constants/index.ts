@@ -1,4 +1,5 @@
 
+/** Constantes globais do sistema, incluindo cores, intervalos e URLs da API */
 export const GPS_INTERVAL_MS = 30_000;
 export const ACCELEROMETER_INTERVAL_MS = 1_000;
 export const BATTERY_INTERVAL_MS = 30_000;

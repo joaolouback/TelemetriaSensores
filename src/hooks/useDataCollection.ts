@@ -1,3 +1,4 @@
+/** Hook para orquestrar a coleta periódica de dados e sincronização com a API */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { CollectionStatus, SensorState } from '../types';
 import { insertSensorLog } from '../database/database';

@@ -1,3 +1,4 @@
+/** Serviço para sincronização de logs locais com a API REST remota */
 import { getUnsyncedLogs, markLogsAsSynced } from '../database/database';
 import { API_URL } from '../constants';
 import { SensorLog } from '../types';

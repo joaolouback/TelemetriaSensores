@@ -1,3 +1,4 @@
+/** Módulo para monitoramento do nível e status de carregamento da bateria */
 import * as Battery from 'expo-battery';
 import { BatteryData } from '../types';
 import { BATTERY_INTERVAL_MS } from '../constants';

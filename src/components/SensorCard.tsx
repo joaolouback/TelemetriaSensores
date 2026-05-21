@@ -1,3 +1,4 @@
+/** Cartão container para exibir dados de sensores e linhas de informação */
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS } from '../constants';

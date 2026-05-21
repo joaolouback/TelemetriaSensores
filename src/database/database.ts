@@ -1,3 +1,4 @@
+/** Gerenciamento do banco de dados SQLite local e persistência de logs */
 import * as SQLite from 'expo-sqlite';
 import { DATABASE_NAME, TABLE_NAME } from '../constants';
 import { SensorLog } from '../types';
@@ -81,9 +82,6 @@ export async function getLastLog(): Promise<SensorLog | null> {
   return result ?? null;
 }
 
-/**
- * Get all sensor log records (limited to last 100).
- */
 export async function getAllLogs(): Promise<SensorLog[]> {
   const database = getDatabase();
   return await database.getAllAsync<SensorLog>(

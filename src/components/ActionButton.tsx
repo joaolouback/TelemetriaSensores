@@ -1,3 +1,4 @@
+/** Componente de botão reutilizável com diferentes variantes de estilo */
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS } from '../constants';

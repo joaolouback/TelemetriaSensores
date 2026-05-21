@@ -1,3 +1,4 @@
+/** Pequeno indicador visual de status (ex: Coletando, Parado) */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants';

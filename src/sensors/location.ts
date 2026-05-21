@@ -1,3 +1,4 @@
+/** Módulo para captura e atualização da localização GPS do dispositivo */
 import * as Location from 'expo-location';
 import { LocationData } from '../types';
 import { GPS_INTERVAL_MS } from '../constants';

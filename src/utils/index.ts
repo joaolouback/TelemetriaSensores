@@ -1,3 +1,4 @@
+/** Funções utilitárias para cálculos matemáticos, formatação de dados e UI */
 /**
  * m = sqrt(x² + y² + z²)
  */

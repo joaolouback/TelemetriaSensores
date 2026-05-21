@@ -1,3 +1,4 @@
+/** Módulo para monitoramento do status de conexão com a internet (Wi-Fi/Cellular) */
 import NetInfo, { NetInfoState, NetInfoSubscription } from '@react-native-community/netinfo';
 import { ConnectivityData } from '../types';
 

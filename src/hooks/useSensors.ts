@@ -1,3 +1,4 @@
+/** Hook para centralizar a leitura e estado dos sensores do dispositivo */
 import { useState, useCallback, useRef } from 'react';
 import {
   LocationData,

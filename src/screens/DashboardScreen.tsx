@@ -1,3 +1,4 @@
+/** Tela principal (Dashboard) que exibe as leituras dos sensores em tempo real */
 import React, { useCallback } from 'react';
 import {
   View,

@@ -1,4 +1,5 @@
 
+/** Definições de interfaces e tipos TypeScript utilizados em toda a aplicação */
 export interface LocationData {
   latitude: number;
   longitude: number;
@@ -14,7 +15,7 @@ export interface AccelerometerData {
 }
 
 export interface BatteryData {
-  level: number; // 0 to 1
+  level: number; // 0 a 1
   isCharging: boolean;
 }
 
@@ -35,7 +36,7 @@ export interface SensorLog {
   magnitude: number | null;
   battery_level: number | null;
   network_type: string | null;
-  synced: number; 
+  synced: number;
   created_at: string;
 }
 

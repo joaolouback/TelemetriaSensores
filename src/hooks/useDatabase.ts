@@ -1,3 +1,4 @@
+/** Hook para gerenciar o estado e operações do banco de dados SQLite */
 import { useState, useEffect, useCallback } from 'react';
 import { SensorLog, StorageInfo } from '../types';
 import {

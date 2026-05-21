@@ -1,3 +1,4 @@
+/** Módulo para captura de dados do acelerômetro e cálculo de magnitude */
 import { Accelerometer as ExpoAccelerometer } from 'expo-sensors';
 import { AccelerometerData } from '../types';
 import { ACCELEROMETER_INTERVAL_MS } from '../constants';
