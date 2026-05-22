@@ -92,7 +92,7 @@ export function DashboardScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <SensorCard title="Localização" icon="📍" color={COLORS.gps} isActive={!!location}>
+        <SensorCard title="Localização" color={COLORS.gps} isActive={!!location}>
           <DataRow label="Latitude" value={formatNumber(location?.latitude, 6)} />
           <DataRow label="Longitude" value={formatNumber(location?.longitude, 6)} />
           <DataRow label="Precisão" value={location?.accuracy ? `${formatNumber(location.accuracy, 1)}m` : '—'} />
@@ -102,7 +102,7 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        <SensorCard title="Acelerômetro" icon="📐" color={COLORS.accelerometer} isActive={!!accelerometer}>
+        <SensorCard title="Acelerômetro" color={COLORS.accelerometer} isActive={!!accelerometer}>
           <DataRow label="Eixo X" value={formatNumber(accelerometer?.x)} color={COLORS.danger} />
           <DataRow label="Eixo Y" value={formatNumber(accelerometer?.y)} color={COLORS.success} />
           <DataRow label="Eixo Z" value={formatNumber(accelerometer?.z)} color={COLORS.info} />
@@ -113,7 +113,7 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        <SensorCard title="Bateria" icon="🔋" color={COLORS.battery} isActive={battery !== null}>
+        <SensorCard title="Bateria" color={COLORS.battery} isActive={battery !== null}>
           <DataRow
             label="Nível"
             value={formatBatteryLevel(battery?.level)}
@@ -127,12 +127,12 @@ export function DashboardScreen() {
           />
           <DataRow
             label="Carregando"
-            value={battery ? (battery.isCharging ? '⚡ Sim' : 'Não') : '—'}
+            value={battery ? (battery.isCharging ? ' Sim' : 'Não') : '—'}
             color={battery?.isCharging ? COLORS.success : COLORS.textSecondary}
           />
         </SensorCard>
 
-        <SensorCard title="Conectividade" icon="📶" color={COLORS.connectivity} isActive={connectivity.isConnected}>
+        <SensorCard title="Conectividade" color={COLORS.connectivity} isActive={connectivity.isConnected}>
           <View style={styles.badgeRow}>
             <StatusBadge
               label="Wi-Fi"
@@ -157,7 +157,7 @@ export function DashboardScreen() {
           />
         </SensorCard>
 
-        <SensorCard title="Armazenamento" icon="💾" color={COLORS.storage} isActive={storageInfo.recordCount > 0}>
+        <SensorCard title="Armazenamento" color={COLORS.storage} isActive={storageInfo.recordCount > 0}>
           <DataRow
             label="Registros SQLite"
             value={storageInfo.recordCount.toString()}
@@ -180,13 +180,13 @@ export function DashboardScreen() {
         <View style={styles.buttonContainer}>
           {!isCollecting ? (
             <ActionButton
-              label="▶  Iniciar Coleta"
+              label="Iniciar Coleta"
               onPress={handleStart}
               variant="success"
             />
           ) : (
             <ActionButton
-              label="⏹  Parar Coleta"
+              label="Parar Coleta"
               onPress={handleStop}
               variant="danger"
             />
@@ -195,14 +195,14 @@ export function DashboardScreen() {
 
         <View style={styles.buttonContainer}>
           <ActionButton
-            label="🗑  Limpar Dados"
+            label="Limpar Dados"
             onPress={handleClear}
             variant="outline"
             disabled={isCollecting || storageInfo.recordCount === 0}
           />
         </View>
 
-        
+
         <Text style={styles.footer}>
           SensorTelemetryApp v1.0
         </Text>

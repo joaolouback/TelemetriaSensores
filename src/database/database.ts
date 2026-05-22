@@ -108,8 +108,18 @@ export async function markLogsAsSynced(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
   const database = getDatabase();
   const placeholders = ids.map(() => '?').join(',');
+  
+  console.log(`[DB] Executando UPDATE: marcando IDs ${ids.join(',')} como sincronizados.`);
+  
   await database.runAsync(
     `UPDATE ${TABLE_NAME} SET synced = 1 WHERE id IN (${placeholders})`,
     ids
   );
+
+  // Verificação rápida
+  const check = await database.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM ${TABLE_NAME} WHERE id IN (${placeholders}) AND synced = 1`,
+    ids
+  );
+  console.log(`[DB] Verificação: ${check?.count} registros agora estão com synced=1.`);
 }
