@@ -4,6 +4,7 @@ import { CollectionStatus, SensorState } from '../types';
 import { insertSensorLog } from '../database/database';
 import { SAVE_INTERVAL_MS, SENSOR_TYPES } from '../constants';
 import { syncLogsWithApi } from '../services/api';
+import { wsService } from '../services/websocket';
 
 interface UseDataCollectionOptions {
   sensorState: SensorState;
@@ -54,6 +55,10 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
     setStatus(CollectionStatus.COLLECTING);
     setSaveCount(0);
 
+    // Inicia conexão WebSocket para sync em tempo real
+    wsService.resetReconnect();
+    wsService.connect();
+
     saveSensorData();
 
     saveTimerRef.current = setInterval(() => {
@@ -66,6 +71,10 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
       clearInterval(saveTimerRef.current);
       saveTimerRef.current = null;
     }
+
+    // Desconecta WebSocket ao parar coleta
+    wsService.disconnect();
+
     setStatus(CollectionStatus.STOPPED);
   }, []);
 
@@ -75,6 +84,8 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
         clearInterval(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      // Cleanup: desconecta WS ao desmontar componente
+      wsService.disconnect();
     };
   }, []);
 
