@@ -50,5 +50,6 @@ export const SENSOR_TYPES = {
   CONNECTIVITY: 'connectivity',
 } as const;
 
-export const API_URL = 'http://172.20.10.6:3000/api';
+export const API_URL = 'http://192.168.100.76:3000/api';
+export const WS_URL = 'ws://192.168.100.76:3000/ws';
 

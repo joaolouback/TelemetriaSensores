@@ -1,37 +1,59 @@
-/** Serviço para sincronização de logs locais com a API REST remota */
+/** Serviço para sincronização de logs — WebSocket (primário) com fallback HTTP */
 import { getUnsyncedLogs, markLogsAsSynced } from '../database/database';
 import { API_URL } from '../constants';
-import { SensorLog } from '../types';
+import { wsService } from './websocket';
 
-
+/**
+ * Sincroniza logs pendentes com o servidor.
+ * Tenta primeiro via WebSocket (conexão persistente).
+ * Se WS não estiver disponível, faz fallback para HTTP POST.
+ */
 export async function syncLogsWithApi(): Promise<number> {
   try {
     const unsyncedLogs = await getUnsyncedLogs();
 
     if (unsyncedLogs.length === 0) {
-      console.log('[API Sync] Nenhum log pendente para sincronizar.');
+      console.log('[Sync] Nenhum log pendente para sincronizar.');
       return 0;
     }
 
-    console.log(`[API Sync] Tentando sincronizar ${unsyncedLogs.length} logs...`);
+    console.log(`[Sync] ${unsyncedLogs.length} logs pendentes. WS conectado: ${wsService.isConnected}`);
 
-    const response = await fetch(`${API_URL}/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(unsyncedLogs),
-    });
+    let syncedCount: number | null = null;
 
-    console.log(`[API Sync] Resposta da API: ${response.status} ${response.statusText}`);
+    // ------ Tentativa 1: WebSocket (tempo real) ------
+    if (wsService.isConnected) {
+      console.log('[Sync] Enviando via WebSocket...');
+      syncedCount = await wsService.sendLogs(unsyncedLogs);
 
-    if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`);
+      if (syncedCount !== null) {
+        console.log(`[Sync] WebSocket OK! ${syncedCount} logs sincronizados.`);
+      } else {
+        console.warn('[Sync] WebSocket falhou, tentando HTTP...');
+      }
     }
 
-    const syncedIds = unsyncedLogs.map(log => log.id).filter((id): id is number => id !== undefined);
+    // ------ Tentativa 2: HTTP POST (fallback) ------
+    if (syncedCount === null) {
+      console.log('[Sync] Enviando via HTTP POST /sync...');
+      const response = await fetch(`${API_URL}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(unsyncedLogs),
+      });
 
-    console.log(`[API Sync] Sucesso! Marcando ${syncedIds.length} IDs como sincronizados:`, syncedIds);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      }
+
+      syncedCount = unsyncedLogs.length;
+      console.log(`[Sync] HTTP OK! ${syncedCount} logs sincronizados.`);
+    }
+
+    // ------ Marca como sincronizados no SQLite ------
+    const syncedIds = unsyncedLogs
+      .map((log) => log.id)
+      .filter((id): id is number => id !== undefined);
 
     if (syncedIds.length > 0) {
       await markLogsAsSynced(syncedIds);
@@ -39,7 +61,7 @@ export async function syncLogsWithApi(): Promise<number> {
 
     return syncedIds.length;
   } catch (error) {
-    console.error('[API Sync] Falha crítica na sincronização:', error);
+    console.error('[Sync] Falha crítica na sincronização:', error);
     return 0;
   }
 }
