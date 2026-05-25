@@ -43,22 +43,29 @@ export function getDatabase(): SQLite.SQLiteDatabase {
 
 export async function insertSensorLog(log: Omit<SensorLog, 'id'>): Promise<number> {
   const database = getDatabase();
+
+  // Helper para sanitizar `NaN` ou `undefined`, que causam NullPointerException no Java (Expo SQLite)
+  const sanitize = (val: number | null | undefined): number | null => {
+    if (val === null || val === undefined || Number.isNaN(val)) return null;
+    return val;
+  };
+
   const result = await database.runAsync(
     `INSERT INTO ${TABLE_NAME} 
      (sensor_type, latitude, longitude, accel_x, accel_y, accel_z, magnitude, battery_level, network_type, synced, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      log.sensor_type,
-      log.latitude ?? null,
-      log.longitude ?? null,
-      log.accel_x ?? null,
-      log.accel_y ?? null,
-      log.accel_z ?? null,
-      log.magnitude ?? null,
-      log.battery_level ?? null,
-      log.network_type ?? null,
-      log.synced,
-      log.created_at,
+      log.sensor_type || 'unknown',
+      sanitize(log.latitude),
+      sanitize(log.longitude),
+      sanitize(log.accel_x),
+      sanitize(log.accel_y),
+      sanitize(log.accel_z),
+      sanitize(log.magnitude),
+      sanitize(log.battery_level),
+      log.network_type || null,
+      log.synced ?? 0,
+      log.created_at || new Date().toISOString(),
     ]
   );
   return result.lastInsertRowId;
@@ -108,9 +115,9 @@ export async function markLogsAsSynced(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
   const database = getDatabase();
   const placeholders = ids.map(() => '?').join(',');
-  
+
   console.log(`[DB] Executando UPDATE: marcando IDs ${ids.join(',')} como sincronizados.`);
-  
+
   await database.runAsync(
     `UPDATE ${TABLE_NAME} SET synced = 1 WHERE id IN (${placeholders})`,
     ids
