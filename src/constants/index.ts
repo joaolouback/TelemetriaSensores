@@ -50,6 +50,11 @@ export const SENSOR_TYPES = {
   CONNECTIVITY: 'connectivity',
 } as const;
 
-export const API_URL = 'http://192.168.100.76:3000/api';
-export const WS_URL = 'ws://192.168.100.76:3000/ws';
+export const API_URL = 'http://192.168.100.59:3000/api';
+export const WS_URL = 'ws://192.168.100.59:3000/ws';
+
+
+// IP atual
+// export const API_URL = 'http://[IP_ADDRESS]/api';
+// export const WS_URL = 'ws://[IP_ADDRESS]/ws';
 
