@@ -60,3 +60,38 @@ export interface SensorState {
   battery: BatteryData | null;
   connectivity: ConnectivityData;
 }
+
+/** Modelo 3D associado a um ponto (renderizado via ARCore). */
+export interface Objeto3D {
+  id: number;
+  nome: string;
+  assetUrl: string;
+  formato: string;
+  escala: number;
+  pontoId: number;
+}
+
+/** Ponto de coleta do campus, vindo da API (`GET /api/pontos`). */
+export interface PontoDeInteresse {
+  id: number;
+  nome: string;
+  descricao: string | null;
+  latitude: number;
+  longitude: number;
+  raioGeofence: number;
+  pontosRecompensa: number;
+  ativo: boolean;
+  objeto3d?: Objeto3D | null;
+}
+
+/** Ponto enriquecido com a distância até o usuário, calculada localmente. */
+export interface PontoComDistancia extends PontoDeInteresse {
+  distanciaMetros: number;
+  dentroDoRaio: boolean;
+}
+
+/** Uma posição do trajeto percorrido, usada para desenhar a rota no mapa. */
+export interface PontoTrajeto {
+  latitude: number;
+  longitude: number;
+}
