@@ -25,19 +25,40 @@ export interface ConnectivityData {
 }
 
 
+/**
+ * Registro da tabela local `telemetria_sensor` (SQLite).
+ * Segue a classe TelemetriaSensor do diagrama de classes; `usuario_id` vem da
+ * associação Usuario 1 —gera→ * TelemetriaSensor e `synced` é controle local de sincronização.
+ */
 export interface SensorLog {
   id?: number;
-  sensor_type: string;
-  latitude: number | null;
-  longitude: number | null;
-  accel_x: number | null;
-  accel_y: number | null;
-  accel_z: number | null;
+  usuario_id: number | null;
+  latitude: number;
+  longitude: number;
+  acelerometro_x: number | null;
+  acelerometro_y: number | null;
+  acelerometro_z: number | null;
   magnitude: number | null;
-  battery_level: number | null;
-  network_type: string | null;
+  /** 0 a 100 (%) */
+  nivel_bateria: number | null;
+  tipo_rede: string | null;
+  /** ISO 8601 */
+  timestamp: string;
   synced: number;
-  created_at: string;
+}
+
+/** Usuário autenticado, como devolvido pela API (`/api/auth/*`). */
+export interface Usuario {
+  id: number;
+  nome: string;
+  email: string;
+  pontuacaoTotal: number;
+  dataCadastro: string;
+}
+
+export interface Sessao {
+  token: string;
+  usuario: Usuario;
 }
 
 

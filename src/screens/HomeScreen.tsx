@@ -20,6 +20,8 @@ import {
   MISSOES_MOCK,
   DESCUBRA_MOCK,
 } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { obterIniciais } from '../utils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DISCOVER_CARD_WIDTH = (SCREEN_WIDTH - 48 - 12) / 2; // padding + gap
@@ -32,7 +34,14 @@ function getSaudacao(): string {
 }
 
 export function HomeScreen() {
-  const user = USER_MOCK;
+  const { usuario } = useAuth();
+  // Nível/XP ainda são mock; nome e iniciais vêm do usuário logado.
+  const primeiroNome = usuario?.nome.trim().split(/\s+/)[0] ?? USER_MOCK.nome;
+  const user = {
+    ...USER_MOCK,
+    nome: primeiroNome,
+    iniciais: usuario ? obterIniciais(usuario.nome) : USER_MOCK.iniciais,
+  };
   const xpProgresso = user.xpAtual / user.xpProximoNivel;
   const xpFaltando = user.xpProximoNivel - user.xpAtual;
 

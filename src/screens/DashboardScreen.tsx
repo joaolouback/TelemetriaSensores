@@ -11,42 +11,29 @@ import {
 import { SensorCard, DataRow } from '../components/SensorCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { ActionButton } from '../components/ActionButton';
-import { useSensors } from '../hooks/useSensors';
-import { useDatabase } from '../hooks/useDatabase';
-import { useDataCollection } from '../hooks/useDataCollection';
+import { useTelemetria } from '../contexts/TelemetriaContext';
 import { CollectionStatus } from '../types';
 import { COLORS } from '../constants';
 import { formatNumber, formatBatteryLevel, formatTimestamp, getNetworkLabel } from '../utils';
 
 export function DashboardScreen() {
+  // A coleta é iniciada automaticamente no TelemetriaProvider; aqui só exibimos
+  // os dados e permitimos pausar/retomar manualmente.
   const {
-    sensorState,
     location,
     accelerometer,
     battery,
     connectivity,
-    startSensors,
-    stopSensors,
-  } = useSensors();
-
-  const { isReady, storageInfo, refreshStorageInfo, clearDatabase } = useDatabase();
-
-  const { status, saveCount, startCollection, stopCollection } = useDataCollection({
-    sensorState,
-    onSaved: refreshStorageInfo,
-  });
+    isReady,
+    storageInfo,
+    clearDatabase,
+    status,
+    saveCount,
+    iniciar: handleStart,
+    parar: handleStop,
+  } = useTelemetria();
 
   const isCollecting = status === CollectionStatus.COLLECTING;
-
-  const handleStart = useCallback(async () => {
-    await startSensors();
-    startCollection();
-  }, [startSensors, startCollection]);
-
-  const handleStop = useCallback(() => {
-    stopCollection();
-    stopSensors();
-  }, [stopCollection, stopSensors]);
 
   const handleClear = useCallback(() => {
     Alert.alert(
@@ -170,8 +157,8 @@ export function DashboardScreen() {
           <DataRow
             label="Último registro"
             value={
-              storageInfo.lastRecord?.created_at
-                ? formatTimestamp(storageInfo.lastRecord.created_at)
+              storageInfo.lastRecord?.timestamp
+                ? formatTimestamp(storageInfo.lastRecord.timestamp)
                 : '—'
             }
           />

@@ -19,7 +19,17 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Trajeto percorrido**: o caminho é desenhado em tempo real (Polyline).
 - **Ponto mais próximo**: distância ao vivo, calculada no aparelho — funciona sem rede.
 
-### Telemetria (Prova de Conceito)
+### Conta de usuário
+- **Login e registro** (e-mail e senha) validados pelo backend (`/api/auth/*`).
+- A sessão fica salva no SQLite: o app abre já logado, mesmo sem internet.
+
+### Telemetria
+- **Início automático**: a coleta começa assim que o app abre (inclusive na tela de
+  login) e funciona offline. A aba *Sensores* permite pausar/retomar.
+- **Tabela `telemetria_sensor`**: mesmas colunas da classe `TelemetriaSensor` do
+  diagrama (`latitude`, `longitude`, `acelerometro_x/y/z`, `magnitude`,
+  `nivel_bateria`, `tipo_rede`, `timestamp`) + `usuario_id` e `synced`. Leituras sem
+  GPS não são gravadas. A tabela antiga `sensor_logs` é migrada automaticamente.
 - **Captura de GPS**: latitude, longitude, precisão e timestamp (a cada 30 segundos).
 - **Acelerômetro**: eixos X, Y, Z e cálculo da magnitude (a cada 1000ms).
 - **Bateria**: nível de carga e status de carregamento.
@@ -27,6 +37,7 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Armazenamento offline**: persistência local em SQLite (`expo-sqlite`), gravando em
   lotes a cada 30 segundos para preservar bateria.
 - **Sincronização**: envio ao backend via WebSocket, com fallback para HTTP REST.
+  Com usuário logado, o token vai junto e os registros ficam associados a ele.
 
 ## 🛠️ Tecnologias Utilizadas
 

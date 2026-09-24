@@ -26,7 +26,12 @@ export const CAMPUS_UVV = {
 
 
 export const DATABASE_NAME = 'sensor_telemetry.db';
-export const TABLE_NAME = 'sensor_logs';
+/** Tabela de coleta — mesmo nome e colunas da tabela do backend (diagrama de classes). */
+export const TABLE_NAME = 'telemetria_sensor';
+/** Tabela da versão anterior do app; migrada para TABLE_NAME na inicialização. */
+export const LEGACY_TABLE_NAME = 'sensor_logs';
+/** Tabela chave/valor para guardar a sessão do usuário (token + dados). */
+export const SESSION_TABLE_NAME = 'sessao';
 
 
 

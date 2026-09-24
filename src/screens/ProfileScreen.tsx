@@ -9,8 +9,11 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { HOME_COLORS, USER_MOCK } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { obterIniciais } from '../utils';
 
 const CONQUISTAS_MOCK = [
   { id: 1, titulo: 'Primeiro Passo', desc: 'Fez check-in no mapa', icone: '📍' },
@@ -20,7 +23,20 @@ const CONQUISTAS_MOCK = [
 ];
 
 export function ProfileScreen() {
-  const user = USER_MOCK;
+  const { usuario, sair } = useAuth();
+  // Nível/XP/conquistas ainda são mock; nome, e-mail e iniciais vêm do usuário logado.
+  const user = {
+    ...USER_MOCK,
+    nome: usuario?.nome ?? USER_MOCK.nome,
+    iniciais: usuario ? obterIniciais(usuario.nome) : USER_MOCK.iniciais,
+  };
+
+  const confirmarSaida = () => {
+    Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: () => sair() },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -38,7 +54,7 @@ export function ProfileScreen() {
           </View>
           <Text style={styles.nome}>{user.nome}</Text>
           <Text style={styles.titulo}>{user.titulo} · Nível {user.nivel}</Text>
-          <Text style={styles.email}>arthur@aluno.uvv.br</Text>
+          <Text style={styles.email}>{usuario?.email}</Text>
         </View>
 
         {/* ESTATÍSTICAS */}
@@ -80,7 +96,11 @@ export function ProfileScreen() {
           <TouchableOpacity style={styles.opcaoItem} activeOpacity={0.7}>
             <Text style={styles.opcaoTexto}>🔔 Notificações</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.opcaoItem, { borderBottomWidth: 0 }]} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[styles.opcaoItem, { borderBottomWidth: 0 }]}
+            activeOpacity={0.7}
+            onPress={confirmarSaida}
+          >
             <Text style={[styles.opcaoTexto, { color: '#EF4444' }]}>🚪 Sair da Conta</Text>
           </TouchableOpacity>
         </View>

@@ -2,15 +2,31 @@
 import { getUnsyncedLogs, markLogsAsSynced } from '../database/database';
 import { API_URL } from '../constants';
 import { wsService } from './websocket';
+import { getToken, getUsuarioId } from './auth';
+
+// Evita dois envios simultâneos do mesmo lote (a coleta dispara um sync a cada gravação,
+// e offline/rede lenta uma tentativa pode demorar mais que o intervalo de coleta).
+let syncEmAndamento: Promise<number> | null = null;
 
 /**
  * Sincroniza logs pendentes com o servidor.
  * Tenta primeiro via WebSocket (conexão persistente).
  * Se WS não estiver disponível, faz fallback para HTTP POST.
+ * Com usuário logado, o token vai junto e o backend associa os registros a ele.
  */
-export async function syncLogsWithApi(): Promise<number> {
+export function syncLogsWithApi(): Promise<number> {
+  if (!syncEmAndamento) {
+    syncEmAndamento = sincronizar().finally(() => {
+      syncEmAndamento = null;
+    });
+  }
+  return syncEmAndamento;
+}
+
+async function sincronizar(): Promise<number> {
   try {
-    const unsyncedLogs = await getUnsyncedLogs();
+    const token = getToken();
+    const unsyncedLogs = await getUnsyncedLogs(getUsuarioId());
 
     if (unsyncedLogs.length === 0) {
       console.log('[Sync] Nenhum log pendente para sincronizar.');
@@ -24,7 +40,7 @@ export async function syncLogsWithApi(): Promise<number> {
     // ------ Tentativa 1: WebSocket (tempo real) ------
     if (wsService.isConnected) {
       console.log('[Sync] Enviando via WebSocket...');
-      syncedCount = await wsService.sendLogs(unsyncedLogs);
+      syncedCount = await wsService.sendLogs(unsyncedLogs, token);
 
       if (syncedCount !== null) {
         console.log(`[Sync] WebSocket OK! ${syncedCount} logs sincronizados.`);
@@ -38,7 +54,10 @@ export async function syncLogsWithApi(): Promise<number> {
       console.log('[Sync] Enviando via HTTP POST /sync...');
       const response = await fetch(`${API_URL}/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(unsyncedLogs),
       });
 

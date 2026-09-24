@@ -91,8 +91,11 @@ class WebSocketService {
     }
   }
 
-  /** Envia logs via WebSocket. Retorna a quantidade inserida ou null se falhar. */
-  async sendLogs(logs: SensorLog[]): Promise<number | null> {
+  /**
+   * Envia logs via WebSocket. Retorna a quantidade inserida ou null se falhar.
+   * O token (JWT) é opcional: se presente, o servidor associa os logs ao usuário.
+   */
+  async sendLogs(logs: SensorLog[], token: string | null = null): Promise<number | null> {
     if (!this.isConnected || !this.ws) {
       console.log('[WS] Não conectado, impossível enviar via WS.');
       return null;
@@ -119,6 +122,7 @@ class WebSocketService {
             type: 'sync',
             requestId,
             logs,
+            ...(token ? { token } : {}),
           })
         );
         console.log(`[WS] Enviados ${logs.length} logs (requestId=${requestId})`);
