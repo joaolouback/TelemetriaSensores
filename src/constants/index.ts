@@ -60,6 +60,86 @@ export const COLORS = {
   cardShadow: 'rgba(0, 0, 0, 0.3)',
 } as const;
 
+/** Cores do tema claro para a HomeScreen gamificada */
+export const HOME_COLORS = {
+  background: '#F5F6FA',
+  card: '#FFFFFF',
+  cardBorder: '#E8EAF0',
+
+  accent: '#1B2B5E',
+  accentLight: '#2A3F7E',
+  accentGradientStart: '#1B2B5E',
+  accentGradientEnd: '#2A4FA0',
+
+  textPrimary: '#1A1A2E',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+
+  xpGold: '#F5A623',
+  xpBarBg: 'rgba(255, 255, 255, 0.25)',
+
+  success: '#10B981',
+  successBg: '#ECFDF5',
+  successText: '#059669',
+
+  missionIcon: '#3B5BDB',
+  missionIconBg: '#EEF2FF',
+
+  discoverBlue: '#3B5BDB',
+  discoverPurple: '#7C3AED',
+
+  tabActive: '#3B5BDB',
+  tabInactive: '#9CA3AF',
+  tabBar: '#FFFFFF',
+  tabBarBorder: '#E5E7EB',
+} as const;
+
+/** Dados mock do usuário para a tela inicial */
+export const USER_MOCK = {
+  nome: 'Arthur',
+  iniciais: 'AR',
+  nivel: 5,
+  titulo: 'Explorador Master',
+  xpAtual: 4200,
+  xpProximoNivel: 5000,
+};
+
+/** Missões diárias mock */
+export const MISSOES_MOCK = [
+  {
+    id: 1,
+    titulo: 'Check-in na Biblioteca',
+    descricao: 'Explore a área de periódicos.',
+    xp: 150,
+    concluida: false,
+    icone: '📖',
+  },
+  {
+    id: 2,
+    titulo: 'Passe pelo Prédio Inova',
+    descricao: 'Concluída hoje às 08:30',
+    xp: 100,
+    concluida: true,
+    icone: '✅',
+  },
+  {
+    id: 3,
+    titulo: 'Visite o Laboratório Maker',
+    descricao: 'Descubra o espaço de criação.',
+    xp: 200,
+    concluida: false,
+    icone: '🔧',
+  },
+];
+
+/** Locais para a seção Descubra (mock) */
+export const DESCUBRA_MOCK = [
+  { id: 1, nome: 'Anfiteatro', distancia: '120m daqui', cor: '#3B5BDB' },
+  { id: 2, nome: 'Lab Maker', distancia: '300m daqui', cor: '#7C3AED' },
+  { id: 3, nome: 'Biblioteca', distancia: '450m daqui', cor: '#059669' },
+  { id: 4, nome: 'Quadra', distancia: '600m daqui', cor: '#D97706' },
+];
+
 
 export const SENSOR_TYPES = {
   COMBINED: 'combined',
