@@ -1,6 +1,6 @@
 import React from 'react';
-import { DashboardScreen } from './src/screens/DashboardScreen';
+import { BottomTabs } from './src/navigation/BottomTabs';
 
 export default function App() {
-  return <DashboardScreen />;
+  return <BottomTabs />;
 }

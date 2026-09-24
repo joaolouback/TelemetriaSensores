@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Telemetria Sensores",
+    "name": "UVV Go",
     "slug": "SensorTelemetryApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -25,7 +25,12 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "COLOQUE_SUA_CHAVE_DO_GOOGLE_MAPS_AQUI"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

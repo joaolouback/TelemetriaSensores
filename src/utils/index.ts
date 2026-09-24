@@ -45,3 +45,42 @@ export function getNetworkLabel(type: string | null): string {
       return 'Desconhecido';
   }
 }
+
+
+/** Raio médio da Terra em metros. */
+const RAIO_TERRA_M = 6_371_000;
+
+const paraRadianos = (graus: number): number => (graus * Math.PI) / 180;
+
+/**
+ * Distância em METROS entre duas coordenadas (fórmula de Haversine).
+ * Mesma fórmula usada no backend (`src/utils/geo.ts`), replicada aqui para
+ * que o app calcule proximidade offline, sem depender da API.
+ */
+export function distanciaEmMetros(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const dLat = paraRadianos(lat2 - lat1);
+  const dLon = paraRadianos(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(paraRadianos(lat1)) *
+      Math.cos(paraRadianos(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return RAIO_TERRA_M * c;
+}
+
+/** Formata uma distância em metros de forma legível (12 m / 1.4 km). */
+export function formatDistancia(metros: number | null | undefined): string {
+  if (metros === null || metros === undefined || Number.isNaN(metros)) return '—';
+  if (metros < 1000) return `${Math.round(metros)} m`;
+  return `${(metros / 1000).toFixed(2)} km`;
+}
