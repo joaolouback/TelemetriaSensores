@@ -11,42 +11,49 @@ import {
 import { SensorCard, DataRow } from '../components/SensorCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { ActionButton } from '../components/ActionButton';
-import { useSensors } from '../hooks/useSensors';
-import { useDatabase } from '../hooks/useDatabase';
-import { useDataCollection } from '../hooks/useDataCollection';
+import { useTelemetria } from '../contexts/TelemetriaContext';
 import { CollectionStatus } from '../types';
 import { COLORS } from '../constants';
 import { formatNumber, formatBatteryLevel, formatTimestamp, getNetworkLabel } from '../utils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function DashboardScreen() {
+  const insets = useSafeAreaInsets();
+  // A coleta é iniciada automaticamente no TelemetriaProvider; aqui só exibimos
+  // os dados e permitimos pausar/retomar manualmente.
   const {
-    sensorState,
     location,
     accelerometer,
     battery,
     connectivity,
-    startSensors,
-    stopSensors,
-  } = useSensors();
-
-  const { isReady, storageInfo, refreshStorageInfo, clearDatabase } = useDatabase();
-
-  const { status, saveCount, startCollection, stopCollection } = useDataCollection({
-    sensorState,
-    onSaved: refreshStorageInfo,
-  });
+    isReady,
+    storageInfo,
+    clearDatabase,
+    status,
+    saveCount,
+    iniciar,
+    parar: handleStop,
+    consentimento,
+    definirConsentimento,
+  } = useTelemetria();
 
   const isCollecting = status === CollectionStatus.COLLECTING;
 
+  // Sem consentimento, iniciar a coleta pede o aceite antes (LGPD).
   const handleStart = useCallback(async () => {
-    await startSensors();
-    startCollection();
-  }, [startSensors, startCollection]);
-
-  const handleStop = useCallback(() => {
-    stopCollection();
-    stopSensors();
-  }, [stopCollection, stopSensors]);
+    if (consentimento === true) {
+      await iniciar();
+      return;
+    }
+    Alert.alert(
+      'Compartilhar telemetria?',
+      'A coleta grava sua localização, movimento e bateria para a pesquisa do TCC. Você pode desligar depois no Perfil.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Aceitar e iniciar', onPress: () => definirConsentimento(true).catch(console.error) },
+      ]
+    );
+  }, [consentimento, iniciar, definirConsentimento]);
 
   const handleClear = useCallback(() => {
     Alert.alert(
@@ -75,9 +82,9 @@ export function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
         <Text style={styles.headerTitle}>Telemetria Sensores</Text>
         <StatusBadge
           label={isCollecting ? 'Coletando' : status === CollectionStatus.STOPPED ? 'Parado' : 'Inativo'}
@@ -170,8 +177,8 @@ export function DashboardScreen() {
           <DataRow
             label="Último registro"
             value={
-              storageInfo.lastRecord?.created_at
-                ? formatTimestamp(storageInfo.lastRecord.created_at)
+              storageInfo.lastRecord?.timestamp
+                ? formatTimestamp(storageInfo.lastRecord.timestamp)
                 : '—'
             }
           />
@@ -204,7 +211,7 @@ export function DashboardScreen() {
 
 
         <Text style={styles.footer}>
-          SensorTelemetryApp v1.0
+          UVV Go · telemetria v1.0
         </Text>
 
         <Text style={styles.footer}>
@@ -235,7 +242,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 56,
     paddingBottom: 16,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,

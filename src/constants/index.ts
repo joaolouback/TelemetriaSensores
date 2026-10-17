@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+import { logDebug } from '../utils/log';
 
 /** Constantes globais do sistema, incluindo cores, intervalos e URLs da API */
 export const GPS_INTERVAL_MS = 30_000;
@@ -26,38 +28,46 @@ export const CAMPUS_UVV = {
 
 
 export const DATABASE_NAME = 'sensor_telemetry.db';
-export const TABLE_NAME = 'sensor_logs';
+/** Tabela de coleta — mesmo nome e colunas da tabela do backend (diagrama de classes). */
+export const TABLE_NAME = 'telemetria_sensor';
+/** Tabela da versão anterior do app; migrada para TABLE_NAME na inicialização. */
+export const LEGACY_TABLE_NAME = 'sensor_logs';
+/** Tabela chave/valor para guardar a sessão do usuário (token + dados). */
+export const SESSION_TABLE_NAME = 'sessao';
 
 
 
+/**
+ * Cores da aba Sensores (painel de telemetria). Tema claro, igual ao resto do app
+ * (`HOME_COLORS`); as cores de cada sensor são mais escuras para contrastar com o branco.
+ */
 export const COLORS = {
-  primary: '#6C63FF',
-  primaryLight: '#A5A0FF',
-  primaryDark: '#4B44CC',
+  primary: '#3B5BDB',
+  primaryLight: '#EEF2FF',
+  primaryDark: '#1B2B5E',
 
-  background: '#0F0F1A',
-  surface: '#1A1A2E',
-  surfaceLight: '#24243E',
-  surfaceElevated: '#2E2E4A',
+  background: '#F5F6FA',
+  surface: '#FFFFFF',
+  surfaceLight: '#F9FAFB',
+  surfaceElevated: '#E5E7EB',
 
+  textPrimary: '#1A1A2E',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
 
-  textPrimary: '#EAEAF0',
-  textSecondary: '#9090A7',
-  textMuted: '#5E5E78',
+  success: '#059669',
+  warning: '#D97706',
+  danger: '#DC2626',
+  info: '#0284C7',
 
-  success: '#00D68F',
-  warning: '#FFB547',
-  danger: '#FF6B6B',
-  info: '#4EC5F1',
+  gps: '#0284C7',
+  accelerometer: '#D97706',
+  battery: '#059669',
+  connectivity: '#7C3AED',
+  storage: '#DB2777',
 
-  gps: '#4EC5F1',
-  accelerometer: '#FFB547',
-  battery: '#00D68F',
-  connectivity: '#6C63FF',
-  storage: '#FF6B9D',
-
-  border: '#2A2A44',
-  cardShadow: 'rgba(0, 0, 0, 0.3)',
+  border: '#E8EAF0',
+  cardShadow: 'rgba(0, 0, 0, 0.06)',
 } as const;
 
 /** Cores do tema claro para a HomeScreen gamificada */
@@ -94,52 +104,6 @@ export const HOME_COLORS = {
   tabBarBorder: '#E5E7EB',
 } as const;
 
-/** Dados mock do usuário para a tela inicial */
-export const USER_MOCK = {
-  nome: 'Arthur',
-  iniciais: 'AR',
-  nivel: 5,
-  titulo: 'Explorador Master',
-  xpAtual: 4200,
-  xpProximoNivel: 5000,
-};
-
-/** Missões diárias mock */
-export const MISSOES_MOCK = [
-  {
-    id: 1,
-    titulo: 'Check-in na Biblioteca',
-    descricao: 'Explore a área de periódicos.',
-    xp: 150,
-    concluida: false,
-    icone: '📖',
-  },
-  {
-    id: 2,
-    titulo: 'Passe pelo Prédio Inova',
-    descricao: 'Concluída hoje às 08:30',
-    xp: 100,
-    concluida: true,
-    icone: '✅',
-  },
-  {
-    id: 3,
-    titulo: 'Visite o Laboratório Maker',
-    descricao: 'Descubra o espaço de criação.',
-    xp: 200,
-    concluida: false,
-    icone: '🔧',
-  },
-];
-
-/** Locais para a seção Descubra (mock) */
-export const DESCUBRA_MOCK = [
-  { id: 1, nome: 'Anfiteatro', distancia: '120m daqui', cor: '#3B5BDB' },
-  { id: 2, nome: 'Lab Maker', distancia: '300m daqui', cor: '#7C3AED' },
-  { id: 3, nome: 'Biblioteca', distancia: '450m daqui', cor: '#059669' },
-  { id: 4, nome: 'Quadra', distancia: '600m daqui', cor: '#D97706' },
-];
-
 
 export const SENSOR_TYPES = {
   COMBINED: 'combined',
@@ -161,7 +125,6 @@ export const SENSOR_TYPES = {
  *   EXPO_PUBLIC_API_HOST=192.168.0.42
  *   EXPO_PUBLIC_API_PORT=3000
  */
-import Constants from 'expo-constants';
 
 export const API_PORT = process.env.EXPO_PUBLIC_API_PORT ?? '3000';
 
@@ -190,8 +153,10 @@ function descobrirHost(): string {
 
 export const API_HOST = descobrirHost();
 
-export const API_URL = `http://${API_HOST}:${API_PORT}/api`;
+/** Raiz do servidor — usada para arquivos estáticos, como os modelos 3D (`/modelos/*.glb`). */
+export const SERVER_URL = `http://${API_HOST}:${API_PORT}`;
+export const API_URL = `${SERVER_URL}/api`;
 export const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 
-console.log(`[constants] Backend: ${API_URL}`);
+logDebug(`[constants] Backend: ${API_URL}`);
 

@@ -18,15 +18,56 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Detecção de proximidade**: o círculo fica verde e um aviso aparece ao entrar no raio de um ponto.
 - **Trajeto percorrido**: o caminho é desenhado em tempo real (Polyline).
 - **Ponto mais próximo**: distância ao vivo, calculada no aparelho — funciona sem rede.
+- **Modo simulação (só em desenvolvimento)**: segurar um ponto da lista coloca o jogador nele,
+  substituindo o GPS no mapa, no geofence e no check-in — para testar a coleta longe do campus.
 
-### Telemetria (Prova de Conceito)
+### Coleta em Realidade Aumentada (ARCore)
+- **Câmera liberada no raio**: dentro do geofence de um ponto aparece o botão *Abrir câmera AR*.
+- **Objeto 3D no mundo real**: o ARCore (via [ViroReact](https://github.com/ReactVision/viro))
+  detecta o chão e posiciona o modelo 3D do ponto (`Objeto3D` da API, em GLB). Sem superfície
+  detectada em ~8 s, o objeto aparece flutuando à frente da câmera.
+- **Toque para coletar**: só ao tocar no objeto o check-in é enviado (`POST /api/interacoes`).
+  O backend revalida o geofence, credita os pontos uma única vez e devolve as conquistas
+  desbloqueadas.
+- **Pontos coletados**: o marcador fica dourado e a câmera não é mais oferecida naquele ponto.
+  A tela *Início* mostra o nível (30 pontos por nível) e as próximas coletas com os pontos reais.
+- **Anti-trapaça**: o check-in envia a precisão do GPS e o aviso de localização simulada do
+  Android (`location.mocked`); o backend recusa GPS falso e leituras piores que ±50 m.
+- **Card do local**: depois da coleta aparece um card com a foto, a descrição e a curiosidade do
+  ponto, os pontos ganhos, as conquistas e o progresso no desafio (`CardLocal`).
+
+### Desafio 1x1
+- **Convite por código**: na tela *Início*, *Criar desafio* gera um código de 6 letras para
+  compartilhar; o amigo entra em *Tenho um código*.
+- **Corrida de 1 hora** pelos 3 pontos sorteados: quem coletar todos primeiro ganha +20 pontos.
+  Se o tempo acabar, vence quem coletou mais.
+- **No mapa**: os pontos do desafio ficam em laranja (⚔️) e um placar com o tempo restante
+  aparece no topo. O placar do oponente se atualiza a cada 5 segundos (`DesafioContext`).
+- **No Perfil**: placar de vitórias, derrotas e empates.
+
+### Conta de usuário
+- **Login e registro** (e-mail e senha) validados pelo backend (`/api/auth/*`).
+- A sessão fica salva no SQLite: o app abre já logado, mesmo sem internet.
+
+### Telemetria
+- **Consentimento (LGPD)**: na primeira abertura, a tela *Sua privacidade* explica o que é
+  coletado e para quê. Só com o aceite a coleta começa — automaticamente, inclusive na tela
+  de login, e offline. Recusar não muda o jogo. O interruptor no *Perfil* desliga a coleta e
+  apaga do aparelho o que ainda não foi enviado. A aba *Sensores* permite pausar/retomar.
+- **Tabela `telemetria_sensor`**: mesmas colunas da classe `TelemetriaSensor` do
+  diagrama (`latitude`, `longitude`, `acelerometro_x/y/z`, `magnitude`,
+  `nivel_bateria`, `tipo_rede`, `timestamp`) + `usuario_id` e `synced`. Leituras sem
+  GPS não são gravadas. A tabela antiga `sensor_logs` é migrada automaticamente.
 - **Captura de GPS**: latitude, longitude, precisão e timestamp (a cada 30 segundos).
 - **Acelerômetro**: eixos X, Y, Z e cálculo da magnitude (a cada 1000ms).
 - **Bateria**: nível de carga e status de carregamento.
 - **Conectividade**: estado da rede (Wi-Fi, dados móveis ou offline).
 - **Armazenamento offline**: persistência local em SQLite (`expo-sqlite`), gravando em
   lotes a cada 30 segundos para preservar bateria.
-- **Sincronização**: envio ao backend via WebSocket, com fallback para HTTP REST.
+- **Sincronização**: envio ao backend via WebSocket, com fallback para HTTP REST, em lotes
+  de até 200 registros (horas offline não travam o envio). Com usuário logado, o token vai
+  junto e os registros ficam associados a ele. Registros já enviados são apagados do
+  aparelho após 7 dias.
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -46,14 +87,14 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 A arquitetura do projeto segue a separação por responsabilidades:
 ```
 src/
-├── components/     → Componentes visuais isolados (SensorCard, ActionButton, StatusBadge)
+├── components/     → Componentes visuais (CardLocal, CardDesafio, PlacarDesafio, SensorCard...)
 ├── constants/      → Constantes do sistema (cores, intervalos, estilo do mapa)
 ├── database/       → Abstrações e instâncias CRUD do SQLite
 ├── hooks/          → Hooks de lógica global (sensores, sqlite, coleta, localização, pontos)
 ├── navigation/     → Alternância entre as telas (Mapa / Sensores)
-├── screens/        → Telas principais (MapScreen, DashboardScreen)
+├── screens/        → Telas principais (MapScreen, ARColetaScreen, DashboardScreen)
 ├── sensors/        → Isolamento da lógica de listeners de sensores nativos
-├── services/       → Comunicação com o backend (api, websocket, pontos)
+├── services/       → Comunicação com o backend (api, websocket, pontos, interacoes, desafios)
 ├── types/          → Interfaces TypeScript e Enums
 └── utils/          → Funções auxiliares (matemática, formatação, distância)
 ```
@@ -67,16 +108,44 @@ src/
    npm install
    ```
 
-2. Inicie o servidor do Expo:
+2. **Na primeira vez**, compile o app na nuvem da Expo (EAS Build, conta gratuita) e
+   instale o APK no celular pelo QR code que aparece no fim — passo a passo no
+   `SETUP.md` da API (seção 3.3):
+   ```bash
+   npm run build:android
+   ```
+   > O app usa ARCore (código nativo), por isso **não roda no Expo Go**: é um
+   > *development build* (`expo-dev-client`), configurado em `eas.json`. Só é preciso
+   > recompilar ao mudar uma dependência nativa, o `app.json`/`app.config.js` ou a chave
+   > do Maps. Com o Android Studio instalado, `npm run android` faz o mesmo localmente.
+
+3. No dia a dia, inicie o Metro e abra o app **UVV Go** no celular:
    ```bash
    npm start
    ```
 
-3. Abra o **Expo Go** no seu dispositivo Android e escaneie o QR Code.
-
-4. Conceda a **permissão de localização** quando o app solicitar.
+4. Conceda a **permissão de localização** quando o app solicitar (a de câmera é pedida
+   na primeira coleta em AR).
 
 O celular e o computador precisam estar na **mesma rede Wi-Fi**.
+
+## ✅ Qualidade
+
+| Script | O que faz |
+| --- | --- |
+| `npm run lint` | ESLint com as regras oficiais do Expo (`eslint-config-expo`) |
+| `npm run typecheck` | TypeScript sem gerar arquivos |
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda os dois a cada push e PR.
+
+Outros cuidados do app:
+- **Bateria:** o GPS de alta frequência do mapa só fica ligado com a aba *Mapa* visível.
+- **Área segura:** cabeçalhos, barra de abas e câmera AR respeitam a barra de status, o
+  entalhe e a barra de navegação de cada aparelho (`react-native-safe-area-context`).
+- **Erros:** um *error boundary* mostra "Algo deu errado · Tentar de novo" em vez de tela branca.
+- **Logs:** `logDebug` só imprime em desenvolvimento.
+- **Acessibilidade:** botões, abas e placares têm papel e descrição para o leitor de tela (TalkBack).
+- **Vibração:** ao coletar, ao errar a coleta e nos momentos do desafio (`expo-haptics`).
 
 ## 🔌 Conexão com o backend
 
@@ -93,9 +162,11 @@ EXPO_PUBLIC_API_PORT=3000
 
 ## 🗺️ Sobre o mapa
 
-O mapa usa o Google Maps através do `react-native-maps`. **No Expo Go funciona sem
-configuração**. Para gerar um APK instalável será necessária uma chave do Google Maps
-em `app.json` (`android.config.googleMaps.apiKey`) — hoje há um placeholder ali.
+O mapa usa o Google Maps através do `react-native-maps`. Como o app não roda mais no
+Expo Go, é **obrigatório** ter uma chave do Google Maps (Maps SDK for Android) — sem ela
+o mapa abre cinza. A chave **não fica no repositório**: o `app.config.js` lê a variável
+`GOOGLE_MAPS_API_KEY`, cadastrada na Expo (`eas env:create`) para o build na nuvem ou no
+`.env` para o build local. Veja os passos 3.2 e 3.3 do `SETUP.md`.
 
 As coordenadas dos 10 pontos ainda são **aproximadas**, definidas no seed do backend
 (`prisma/seed.ts`), à espera da coleta em campo. Testando fora do campus, os pontos

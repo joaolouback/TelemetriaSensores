@@ -54,6 +54,7 @@ export function useLiveLocation(ativo: boolean = true) {
               longitude: atual.coords.longitude,
               accuracy: atual.coords.accuracy,
               timestamp: atual.timestamp,
+              mocked: atual.mocked,
             });
           }
         } catch {
@@ -74,6 +75,7 @@ export function useLiveLocation(ativo: boolean = true) {
               longitude: posicao.coords.longitude,
               accuracy: posicao.coords.accuracy,
               timestamp: posicao.timestamp,
+              mocked: posicao.mocked,
             };
 
             setLocalizacao(dados);

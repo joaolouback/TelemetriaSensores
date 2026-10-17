@@ -1,6 +1,6 @@
 /** Hook para gerenciar o estado e operações do banco de dados SQLite */
 import { useState, useEffect, useCallback } from 'react';
-import { SensorLog, StorageInfo } from '../types';
+import { StorageInfo } from '../types';
 import {
   initDatabase,
   getLogCount,
@@ -18,6 +18,18 @@ export function useDatabase() {
   const [error, setError] = useState<string | null>(null);
 
  
+  const refreshStorageInfo = useCallback(async () => {
+    try {
+      const [count, last] = await Promise.all([getLogCount(), getLastLog()]);
+      setStorageInfo({
+        recordCount: count,
+        lastRecord: last,
+      });
+    } catch (err) {
+      console.warn('[useDatabase] Refresh error:', err);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -41,20 +53,9 @@ export function useDatabase() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [refreshStorageInfo]);
 
 
-  const refreshStorageInfo = useCallback(async () => {
-    try {
-      const [count, last] = await Promise.all([getLogCount(), getLastLog()]);
-      setStorageInfo({
-        recordCount: count,
-        lastRecord: last,
-      });
-    } catch (err) {
-      console.warn('[useDatabase] Refresh error:', err);
-    }
-  }, []);
 
   
   const clearDatabase = useCallback(async () => {

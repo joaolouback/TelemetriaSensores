@@ -1,7 +1,7 @@
 /**
  * Tela de Perfil do Usuário — UVV Go
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,20 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  Alert,
+  Switch,
 } from 'react-native';
-import { HOME_COLORS, USER_MOCK } from '../constants';
+import { Ionicons } from '@expo/vector-icons';
+import { HOME_COLORS } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { useTelemetria } from '../contexts/TelemetriaContext';
+import { obterIniciais } from '../utils';
+import { calcularNivel } from '../utils/nivel';
+import { useColetas } from '../hooks/useColetas';
+import { useDesafio } from '../contexts/DesafioContext';
+import { buscarPlacarDesafios } from '../services/desafios';
+import { PlacarDesafios } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CONQUISTAS_MOCK = [
   { id: 1, titulo: 'Primeiro Passo', desc: 'Fez check-in no mapa', icone: '📍' },
@@ -20,7 +32,48 @@ const CONQUISTAS_MOCK = [
 ];
 
 export function ProfileScreen() {
-  const user = USER_MOCK;
+  const insets = useSafeAreaInsets();
+  const { usuario, sair } = useAuth();
+  const { consentimento, definirConsentimento } = useTelemetria();
+  const { coletados } = useColetas();
+  // Pontuação, nível e locais são reais; a lista de conquistas ainda é mock.
+  const pontuacao = usuario?.pontuacaoTotal ?? 0;
+  const nivel = calcularNivel(pontuacao);
+  const user = {
+    nome: usuario?.nome ?? '',
+    iniciais: usuario ? obterIniciais(usuario.nome) : '',
+  };
+
+  // Placar dos desafios 1x1. Recarrega quando a pontuação muda (vitória dá bônus).
+  const [placar, setPlacar] = useState<PlacarDesafios | null>(null);
+  const { desafio } = useDesafio();
+  useEffect(() => {
+    buscarPlacarDesafios()
+      .then(({ vitorias, derrotas, empates }) => setPlacar({ vitorias, derrotas, empates }))
+      .catch(() => undefined);
+  }, [usuario?.id, pontuacao, desafio?.status]);
+
+  const alternarTelemetria = (ligar: boolean) => {
+    if (ligar) {
+      definirConsentimento(true).catch(console.error);
+      return;
+    }
+    Alert.alert(
+      'Parar de compartilhar?',
+      'A coleta será desligada e os registros que ainda não foram enviados serão apagados do aparelho.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Desligar', style: 'destructive', onPress: () => definirConsentimento(false).catch(console.error) },
+      ]
+    );
+  };
+
+  const confirmarSaida = () => {
+    Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: () => sair() },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -32,24 +85,31 @@ export function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header Perfil */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
           <View style={styles.avatarGrande}>
             <Text style={styles.avatarTexto}>{user.iniciais}</Text>
           </View>
           <Text style={styles.nome}>{user.nome}</Text>
-          <Text style={styles.titulo}>{user.titulo} · Nível {user.nivel}</Text>
-          <Text style={styles.email}>arthur@aluno.uvv.br</Text>
+          <Text style={styles.titulo}>{nivel.titulo} · Nível {nivel.nivel}</Text>
+          <Text style={styles.email}>{usuario?.email}</Text>
+          {placar && placar.vitorias + placar.derrotas + placar.empates > 0 && (
+            <Text style={styles.placarDesafios}>
+              Desafios: {placar.vitorias} {placar.vitorias === 1 ? 'vitória' : 'vitórias'} ·{' '}
+              {placar.derrotas} {placar.derrotas === 1 ? 'derrota' : 'derrotas'} · {placar.empates}{' '}
+              {placar.empates === 1 ? 'empate' : 'empates'}
+            </Text>
+          )}
         </View>
 
         {/* ESTATÍSTICAS */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Text style={styles.statValor}>{user.xpAtual.toLocaleString('pt-BR')}</Text>
-            <Text style={styles.statLabel}>Total XP</Text>
+            <Text style={styles.statValor}>{pontuacao.toLocaleString('pt-BR')}</Text>
+            <Text style={styles.statLabel}>Pontos</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statValor}>12</Text>
+            <Text style={styles.statValor}>{coletados.size}</Text>
             <Text style={styles.statLabel}>Locais Visitados</Text>
           </View>
           <View style={styles.statDivider} />
@@ -74,14 +134,30 @@ export function ProfileScreen() {
 
         {/* OPÇÕES */}
         <View style={styles.opcoesContainer}>
-          <TouchableOpacity style={styles.opcaoItem} activeOpacity={0.7}>
-            <Text style={styles.opcaoTexto}>⚙️ Configurações da Conta</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.opcaoItem} activeOpacity={0.7}>
-            <Text style={styles.opcaoTexto}>🔔 Notificações</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.opcaoItem, { borderBottomWidth: 0 }]} activeOpacity={0.7}>
-            <Text style={[styles.opcaoTexto, { color: '#EF4444' }]}>🚪 Sair da Conta</Text>
+          <View style={[styles.opcaoItem, styles.opcaoLinha]}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={HOME_COLORS.discoverBlue} style={styles.opcaoIcone} />
+            <View style={styles.opcaoTextos}>
+              <Text style={styles.opcaoTexto}>Compartilhar telemetria</Text>
+              <Text style={styles.opcaoDescricao}>
+                GPS, movimento e bateria para a pesquisa do TCC
+              </Text>
+            </View>
+            <Switch
+              value={consentimento === true}
+              onValueChange={alternarTelemetria}
+              trackColor={{ true: HOME_COLORS.discoverBlue, false: HOME_COLORS.cardBorder }}
+              thumbColor="#FFFFFF"
+              accessibilityLabel="Compartilhar telemetria para a pesquisa do TCC"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.opcaoItem, styles.opcaoLinha, { borderBottomWidth: 0 }]}
+            activeOpacity={0.7}
+            onPress={confirmarSaida}
+            accessibilityRole="button"
+          >
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" style={styles.opcaoIcone} />
+            <Text style={[styles.opcaoTexto, { color: '#EF4444' }]}>Sair da conta</Text>
           </TouchableOpacity>
         </View>
 
@@ -105,7 +181,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 56,
     paddingBottom: 20,
   },
   avatarGrande: {
@@ -139,6 +214,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: HOME_COLORS.textSecondary,
     marginTop: 2,
+  },
+  placarDesafios: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F97316',
+    marginTop: 8,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -221,5 +302,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: HOME_COLORS.textPrimary,
+  },
+  opcaoLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  opcaoIcone: {
+    marginRight: 12,
+  },
+  opcaoTextos: {
+    flex: 1,
+    marginRight: 12,
+  },
+  opcaoDescricao: {
+    fontSize: 12,
+    color: HOME_COLORS.textSecondary,
+    marginTop: 2,
   },
 });
