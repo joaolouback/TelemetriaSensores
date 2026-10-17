@@ -6,6 +6,7 @@ import { TelemetriaProvider, useTelemetria } from './src/contexts/TelemetriaCont
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegistroScreen } from './src/screens/RegistroScreen';
 import { ConsentimentoScreen } from './src/screens/ConsentimentoScreen';
+import { DesafioProvider } from './src/contexts/DesafioContext';
 import { HOME_COLORS } from './src/constants';
 
 /**
@@ -38,7 +39,11 @@ function Conteudo() {
     );
   }
 
-  return <BottomTabs />;
+  return (
+    <DesafioProvider>
+      <BottomTabs />
+    </DesafioProvider>
+  );
 }
 
 export default function App() {

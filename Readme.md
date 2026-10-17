@@ -33,6 +33,17 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
   A tela *Início* mostra o nível (30 pontos por nível) e as próximas coletas com os pontos reais.
 - **Anti-trapaça**: o check-in envia a precisão do GPS e o aviso de localização simulada do
   Android (`location.mocked`); o backend recusa GPS falso e leituras piores que ±50 m.
+- **Card do local**: depois da coleta aparece um card com a foto, a descrição e a curiosidade do
+  ponto, os pontos ganhos, as conquistas e o progresso no desafio (`CardLocal`).
+
+### Desafio 1x1
+- **Convite por código**: na tela *Início*, *Criar desafio* gera um código de 6 letras para
+  compartilhar; o amigo entra em *Tenho um código*.
+- **Corrida de 1 hora** pelos 3 pontos sorteados: quem coletar todos primeiro ganha +20 pontos.
+  Se o tempo acabar, vence quem coletou mais.
+- **No mapa**: os pontos do desafio ficam em laranja (⚔️) e um placar com o tempo restante
+  aparece no topo. O placar do oponente se atualiza a cada 5 segundos (`DesafioContext`).
+- **No Perfil**: placar de vitórias, derrotas e empates.
 
 ### Conta de usuário
 - **Login e registro** (e-mail e senha) validados pelo backend (`/api/auth/*`).
@@ -76,14 +87,14 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 A arquitetura do projeto segue a separação por responsabilidades:
 ```
 src/
-├── components/     → Componentes visuais isolados (SensorCard, ActionButton, StatusBadge)
+├── components/     → Componentes visuais (CardLocal, CardDesafio, PlacarDesafio, SensorCard...)
 ├── constants/      → Constantes do sistema (cores, intervalos, estilo do mapa)
 ├── database/       → Abstrações e instâncias CRUD do SQLite
 ├── hooks/          → Hooks de lógica global (sensores, sqlite, coleta, localização, pontos)
 ├── navigation/     → Alternância entre as telas (Mapa / Sensores)
 ├── screens/        → Telas principais (MapScreen, ARColetaScreen, DashboardScreen)
 ├── sensors/        → Isolamento da lógica de listeners de sensores nativos
-├── services/       → Comunicação com o backend (api, websocket, pontos, interacoes)
+├── services/       → Comunicação com o backend (api, websocket, pontos, interacoes, desafios)
 ├── types/          → Interfaces TypeScript e Enums
 └── utils/          → Funções auxiliares (matemática, formatação, distância)
 ```

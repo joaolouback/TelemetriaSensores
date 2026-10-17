@@ -106,9 +106,59 @@ export interface Conquista {
 /** Resposta do check-in (`POST /api/interacoes`) quando o objeto é coletado. */
 export interface ResultadoCheckin {
   distanciaMetros: number;
+  /** 0 quando o ponto já tinha sido coletado e o toque só contou para o desafio. */
   pontosGanhos: number;
   pontuacaoTotal: number;
   novasConquistas: Conquista[];
+  /** Progresso no desafio 1x1, se o ponto faz parte do desafio em andamento. */
+  desafio: ColetaDesafio | null;
+}
+
+// ─── Desafio 1x1 (`/api/desafios`) ───────────────────────────────────
+
+export type StatusDesafio = 'AGUARDANDO' | 'EM_ANDAMENTO' | 'FINALIZADO' | 'CANCELADO' | 'EXPIRADO';
+export type ResultadoDesafio = 'vitoria' | 'derrota' | 'empate';
+
+export interface JogadorDesafio {
+  id: number;
+  nome: string;
+  /** Ids dos pontos do desafio já coletados por este jogador. */
+  coletados: number[];
+}
+
+/** Desafio visto pelo usuário logado (`eu`). Datas em ISO 8601. */
+export interface Desafio {
+  id: number;
+  codigo: string;
+  status: StatusDesafio;
+  papel: 'desafiante' | 'desafiado';
+  criadoEm: string;
+  conviteExpiraEm: string;
+  iniciadoEm: string | null;
+  terminaEm: string | null;
+  finalizadoEm: string | null;
+  /** Hora do servidor na resposta — corrige o cronômetro se o relógio do celular estiver errado. */
+  agora: string;
+  pontos: { id: number; nome: string; latitude: number; longitude: number; raioGeofence: number }[];
+  eu: JogadorDesafio;
+  oponente: JogadorDesafio | null;
+  resultado: ResultadoDesafio | null;
+  bonusVitoria: number;
+}
+
+export interface ColetaDesafio {
+  desafioId: number;
+  coletados: number;
+  total: number;
+  finalizado: boolean;
+  resultado: ResultadoDesafio | null;
+  bonus: number;
+}
+
+export interface PlacarDesafios {
+  vitorias: number;
+  derrotas: number;
+  empates: number;
 }
 
 /** Ponto de coleta do campus, vindo da API (`GET /api/pontos`). */
@@ -121,6 +171,10 @@ export interface PontoDeInteresse {
   raioGeofence: number;
   pontosRecompensa: number;
   ativo: boolean;
+  /** História/curiosidade mostrada no card do local depois da coleta. */
+  curiosidade?: string | null;
+  /** Foto do local — relativa ao servidor (ex.: `/imagens/biblioteca.jpg`) ou absoluta. */
+  imagemUrl?: string | null;
   objeto3d?: Objeto3D | null;
 }
 

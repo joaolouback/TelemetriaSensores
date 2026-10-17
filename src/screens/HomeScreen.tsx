@@ -21,6 +21,7 @@ import { usePontos } from '../hooks/usePontos';
 import { useColetas } from '../hooks/useColetas';
 import { obterIniciais } from '../utils';
 import { calcularNivel } from '../utils/nivel';
+import { CardDesafio } from '../components/CardDesafio';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DISCOVER_CARD_WIDTH = (SCREEN_WIDTH - 48 - 12) / 2; // padding + gap
@@ -103,6 +104,9 @@ export function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* ─── Desafio 1x1 ─── */}
+        <CardDesafio />
 
         {/* ─── Próximas coletas ─── */}
         <View style={styles.secaoHeader}>

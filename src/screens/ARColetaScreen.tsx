@@ -31,7 +31,9 @@ import {
   isARSupportedOnDevice,
   requestRequiredPermissions,
 } from '@reactvision/react-viro';
-import { HOME_COLORS, SERVER_URL } from '../constants';
+import { HOME_COLORS } from '../constants';
+import { CardLocal } from '../components/CardLocal';
+import { urlDoServidor } from '../utils/url';
 import { registrarCheckin, CheckinError } from '../services/interacoes';
 import { LocationData, PontoComDistancia, ResultadoCheckin } from '../types';
 
@@ -130,7 +132,7 @@ function resolverModelo(ponto: PontoComDistancia) {
   const url = objeto?.assetUrl || MODELO_PADRAO;
   const formato = (objeto?.formato?.toUpperCase() ?? 'GLB') as PropsCena['formato'];
   return {
-    modeloUrl: /^https?:\/\//.test(url) ? url : `${SERVER_URL}${url.startsWith('/') ? '' : '/'}${url}`,
+    modeloUrl: urlDoServidor(url),
     formato: ['GLB', 'GLTF', 'OBJ', 'VRX'].includes(formato) ? formato : 'GLB',
     escala: objeto?.escala ?? ESCALA_PADRAO,
   };
@@ -144,9 +146,21 @@ interface Props {
   onColetado: (pontoId: number, resultado: ResultadoCheckin) => void;
   /** O backend respondeu que o ponto já tinha sido coletado. */
   onJaColetado: (pontoId: number) => void;
+  /** O ponto já foi coletado no jogo normal (o toque só vale para o desafio). */
+  jaColetado: boolean;
+  /** O ponto faz parte do desafio em andamento e ainda falta coletá-lo. */
+  valeNoDesafio: boolean;
 }
 
-export function ARColetaScreen({ ponto, localizacao, onFechar, onColetado, onJaColetado }: Props) {
+export function ARColetaScreen({
+  ponto,
+  localizacao,
+  onFechar,
+  onColetado,
+  onJaColetado,
+  jaColetado,
+  valeNoDesafio,
+}: Props) {
   const [fase, setFase] = useState<Fase>('verificando');
   const [rastreando, setRastreando] = useState(false);
   const [flutuante, setFlutuante] = useState(false);
@@ -269,7 +283,14 @@ export function ARColetaScreen({ ponto, localizacao, onFechar, onColetado, onJaC
           fase={fase}
           rastreando={rastreando}
           flutuante={flutuante}
-          pontos={ponto.pontosRecompensa}
+          ponto={ponto}
+          valor={
+            valeNoDesafio && jaColetado
+              ? 'Conta para o seu desafio!'
+              : valeNoDesafio
+                ? `Vale ${ponto.pontosRecompensa} pontos e conta para o seu desafio!`
+                : `Vale ${ponto.pontosRecompensa} pontos.`
+          }
           mensagemErro={mensagemErro}
           resultado={resultado}
           onFechar={onFechar}
@@ -284,7 +305,9 @@ function Rodape(props: {
   fase: Fase;
   rastreando: boolean;
   flutuante: boolean;
-  pontos: number;
+  ponto: PontoComDistancia;
+  /** Texto do que o toque vale (pontos e/ou desafio). */
+  valor: string;
   mensagemErro: string | null;
   resultado: ResultadoCheckin | null;
   onFechar: () => void;
@@ -343,7 +366,7 @@ function Rodape(props: {
         <View style={[styles.cartao, styles.cartaoDestaque]}>
           <Text style={styles.cartaoTitulo}>Toque no cristal para coletar!</Text>
           <Text style={styles.cartaoTexto}>
-            Vale {props.pontos} pontos.
+            {props.valor}
             {props.flutuante ? ' Olhe ao redor: ele está flutuando à sua frente.' : ''}
           </Text>
         </View>
@@ -358,20 +381,9 @@ function Rodape(props: {
       );
 
     case 'coletado':
-      return (
-        <View style={[styles.cartao, styles.cartaoSucesso]}>
-          <Text style={styles.sucessoPontos}>+{resultado?.pontosGanhos ?? props.pontos} pontos</Text>
-          <Text style={styles.cartaoTexto}>
-            Objeto coletado! Sua pontuação agora é {resultado?.pontuacaoTotal ?? '—'}.
-          </Text>
-          {resultado?.novasConquistas.map((c) => (
-            <Text key={c.id} style={styles.conquista}>
-              🏅 Conquista desbloqueada: {c.titulo}
-            </Text>
-          ))}
-          <Botao texto="Voltar ao mapa" onPress={props.onFechar} />
-        </View>
-      );
+      return resultado ? (
+        <CardLocal ponto={props.ponto} resultado={resultado} onFechar={props.onFechar} />
+      ) : null;
 
     case 'erro':
       return (
@@ -461,10 +473,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: HOME_COLORS.xpGold,
   },
-  cartaoSucesso: {
-    borderWidth: 2,
-    borderColor: HOME_COLORS.success,
-  },
   cartaoTitulo: {
     color: HOME_COLORS.textPrimary,
     fontSize: 16,
@@ -476,17 +484,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  sucessoPontos: {
-    color: HOME_COLORS.successText,
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  conquista: {
-    color: HOME_COLORS.accent,
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   botao: {
     alignSelf: 'stretch',

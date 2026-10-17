@@ -21,6 +21,8 @@ import { useLiveLocation } from '../hooks/useLiveLocation';
 import { usePontos } from '../hooks/usePontos';
 import { useColetas } from '../hooks/useColetas';
 import { useAuth } from '../contexts/AuthContext';
+import { useDesafio } from '../contexts/DesafioContext';
+import { PlacarDesafio, COR_DESAFIO } from '../components/PlacarDesafio';
 import { ARColetaScreen } from './ARColetaScreen';
 import { CAMPUS_UVV, MAP_DEFAULT_DELTA, HOME_COLORS } from '../constants';
 import { formatDistancia, formatNumber } from '../utils';
@@ -68,18 +70,25 @@ export function MapScreen() {
 
   const { coletados, marcarColetado } = useColetas();
   const { atualizarPontuacao } = useAuth();
+  const { desafio, pendentes, ajusteRelogio, atualizar: atualizarDesafio } = useDesafio();
+  const desafioEmAndamento = desafio?.status === 'EM_ANDAMENTO' ? desafio : null;
   /** Ponto aberto na câmera de AR (null = câmera fechada). */
   const [pontoAR, setPontoAR] = useState<PontoComDistancia | null>(null);
 
-  // Ponto do raio atual que ainda pode ser coletado — habilita o botão da câmera.
-  const pontoParaColetar = pontosAtivos.find((p) => !coletados.has(p.id)) ?? null;
+  // Ponto do raio atual que ainda vale algo — habilita o botão da câmera.
+  // Os do desafio vêm primeiro: contam mesmo que já tenham sido coletados antes.
+  const pontoParaColetar =
+    pontosAtivos.find((p) => pendentes.has(p.id)) ??
+    pontosAtivos.find((p) => !coletados.has(p.id)) ??
+    null;
 
   const handleColetado = useCallback(
     (pontoId: number, resultado: ResultadoCheckin) => {
       marcarColetado(pontoId);
       atualizarPontuacao(resultado.pontuacaoTotal);
+      if (resultado.desafio) atualizarDesafio();
     },
-    [marcarColetado, atualizarPontuacao]
+    [marcarColetado, atualizarPontuacao, atualizarDesafio]
   );
 
   const mapRef = useRef<MapView | null>(null);
@@ -159,39 +168,52 @@ export function MapScreen() {
         toolbarEnabled={false}
         onPanDrag={() => setSeguindoUsuario(false)}
       >
-        {pontosComDistancia.map((ponto) => (
-          <React.Fragment key={ponto.id}>
-            <Circle
-              center={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-              radius={ponto.raioGeofence}
-              strokeWidth={2}
-              strokeColor={ponto.dentroDoRaio ? HOME_COLORS.success : HOME_COLORS.discoverBlue}
-              fillColor={
-                ponto.dentroDoRaio
-                  ? 'rgba(16, 185, 129, 0.25)'
-                  : 'rgba(59, 91, 219, 0.12)'
-              }
-            />
-            <Marker
-              coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-              title={ponto.nome}
-              description={
-                Number.isNaN(ponto.distanciaMetros)
-                  ? ponto.descricao ?? ''
-                  : `${formatDistancia(ponto.distanciaMetros)} · ` +
-                    (coletados.has(ponto.id) ? 'coletado ✓' : `${ponto.pontosRecompensa} pts`)
-              }
-              pinColor={
-                coletados.has(ponto.id)
-                  ? HOME_COLORS.xpGold
-                  : ponto.dentroDoRaio
-                    ? HOME_COLORS.success
-                    : HOME_COLORS.discoverBlue
-              }
-              onPress={() => setPontoSelecionado(ponto)}
-            />
-          </React.Fragment>
-        ))}
+        {pontosComDistancia.map((ponto) => {
+          const doDesafio = pendentes.has(ponto.id);
+          return (
+            <React.Fragment key={ponto.id}>
+              <Circle
+                center={{ latitude: ponto.latitude, longitude: ponto.longitude }}
+                radius={ponto.raioGeofence}
+                strokeWidth={doDesafio ? 3 : 2}
+                strokeColor={
+                  ponto.dentroDoRaio ? HOME_COLORS.success : doDesafio ? COR_DESAFIO : HOME_COLORS.discoverBlue
+                }
+                fillColor={
+                  ponto.dentroDoRaio
+                    ? 'rgba(16, 185, 129, 0.25)'
+                    : doDesafio
+                      ? 'rgba(249, 115, 22, 0.18)'
+                      : 'rgba(59, 91, 219, 0.12)'
+                }
+              />
+              <Marker
+                coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
+                title={doDesafio ? `⚔️ ${ponto.nome}` : ponto.nome}
+                description={
+                  Number.isNaN(ponto.distanciaMetros)
+                    ? ponto.descricao ?? ''
+                    : `${formatDistancia(ponto.distanciaMetros)} · ` +
+                      (doDesafio
+                        ? 'ponto do desafio'
+                        : coletados.has(ponto.id)
+                          ? 'coletado ✓'
+                          : `${ponto.pontosRecompensa} pts`)
+                }
+                pinColor={
+                  doDesafio
+                    ? COR_DESAFIO
+                    : coletados.has(ponto.id)
+                      ? HOME_COLORS.xpGold
+                      : ponto.dentroDoRaio
+                        ? HOME_COLORS.success
+                        : HOME_COLORS.discoverBlue
+                }
+                onPress={() => setPontoSelecionado(ponto)}
+              />
+            </React.Fragment>
+          );
+        })}
 
         {simulacao && (
           <Marker
@@ -236,9 +258,16 @@ export function MapScreen() {
         )}
       </View>
 
+      {/* Placar do desafio em andamento */}
+      {desafioEmAndamento && (
+        <View style={styles.placarDesafio}>
+          <PlacarDesafio desafio={desafioEmAndamento} ajusteRelogio={ajusteRelogio} />
+        </View>
+      )}
+
       {/* Aviso de geofence ativo */}
       {pontosAtivos.length > 0 && (
-        <View style={styles.alertaGeofence}>
+        <View style={[styles.alertaGeofence, desafioEmAndamento && styles.abaixoDoPlacar]}>
           <Text style={styles.alertaTexto}>
             Você chegou em {pontosAtivos.map((p) => p.nome).join(', ')}
           </Text>
@@ -249,7 +278,12 @@ export function MapScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.botaoARTexto}>
-                📷 Abrir câmera AR · +{pontoParaColetar.pontosRecompensa} pts
+                📷 Abrir câmera AR ·{' '}
+                {pendentes.has(pontoParaColetar.id)
+                  ? coletados.has(pontoParaColetar.id)
+                    ? '⚔️ desafio'
+                    : `+${pontoParaColetar.pontosRecompensa} pts e ⚔️ desafio`
+                  : `+${pontoParaColetar.pontosRecompensa} pts`}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -271,6 +305,8 @@ export function MapScreen() {
             onFechar={() => setPontoAR(null)}
             onColetado={handleColetado}
             onJaColetado={marcarColetado}
+            jaColetado={coletados.has(pontoAR.id)}
+            valeNoDesafio={pendentes.has(pontoAR.id)}
           />
         )}
       </Modal>
@@ -362,7 +398,7 @@ export function MapScreen() {
               }
             >
               <Text style={styles.chipNome} numberOfLines={1}>
-                {ponto.nome}
+                {pendentes.has(ponto.id) ? '⚔️ ' : ''}{ponto.nome}
               </Text>
               <Text style={[styles.chipDistancia, ponto.dentroDoRaio && { color: HOME_COLORS.success }]}>
                 {formatDistancia(ponto.distanciaMetros)}
@@ -466,6 +502,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
     textAlign: 'center',
+  },
+  placarDesafio: {
+    position: 'absolute',
+    top: 116,
+    left: 16,
+    right: 16,
+  },
+  abaixoDoPlacar: {
+    top: 164,
   },
   alertaSubtexto: {
     color: 'rgba(255, 255, 255, 0.9)',

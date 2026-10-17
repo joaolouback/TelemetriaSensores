@@ -1,7 +1,7 @@
 /**
  * Tela de Perfil do Usuário — UVV Go
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,9 @@ import { useTelemetria } from '../contexts/TelemetriaContext';
 import { obterIniciais } from '../utils';
 import { calcularNivel } from '../utils/nivel';
 import { useColetas } from '../hooks/useColetas';
+import { useDesafio } from '../contexts/DesafioContext';
+import { buscarPlacarDesafios } from '../services/desafios';
+import { PlacarDesafios } from '../types';
 
 const CONQUISTAS_MOCK = [
   { id: 1, titulo: 'Primeiro Passo', desc: 'Fez check-in no mapa', icone: '📍' },
@@ -37,6 +40,15 @@ export function ProfileScreen() {
     nome: usuario?.nome ?? '',
     iniciais: usuario ? obterIniciais(usuario.nome) : '',
   };
+
+  // Placar dos desafios 1x1. Recarrega quando a pontuação muda (vitória dá bônus).
+  const [placar, setPlacar] = useState<PlacarDesafios | null>(null);
+  const { desafio } = useDesafio();
+  useEffect(() => {
+    buscarPlacarDesafios()
+      .then(({ vitorias, derrotas, empates }) => setPlacar({ vitorias, derrotas, empates }))
+      .catch(() => undefined);
+  }, [usuario?.id, pontuacao, desafio?.status]);
 
   const alternarTelemetria = (ligar: boolean) => {
     if (ligar) {
@@ -77,6 +89,13 @@ export function ProfileScreen() {
           <Text style={styles.nome}>{user.nome}</Text>
           <Text style={styles.titulo}>{nivel.titulo} · Nível {nivel.nivel}</Text>
           <Text style={styles.email}>{usuario?.email}</Text>
+          {placar && placar.vitorias + placar.derrotas + placar.empates > 0 && (
+            <Text style={styles.placarDesafios}>
+              ⚔️ Desafios: {placar.vitorias} {placar.vitorias === 1 ? 'vitória' : 'vitórias'} ·{' '}
+              {placar.derrotas} {placar.derrotas === 1 ? 'derrota' : 'derrotas'} · {placar.empates}{' '}
+              {placar.empates === 1 ? 'empate' : 'empates'}
+            </Text>
+          )}
         </View>
 
         {/* ESTATÍSTICAS */}
@@ -195,6 +214,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: HOME_COLORS.textSecondary,
     marginTop: 2,
+  },
+  placarDesafios: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F97316',
+    marginTop: 8,
   },
   statsContainer: {
     flexDirection: 'row',

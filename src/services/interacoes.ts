@@ -59,8 +59,7 @@ export async function registrarCheckin(pontoId: number, posicao: LocationData): 
   return dados as ResultadoCheckin;
 }
 
-/** Ids dos pontos que o usuário logado já coletou (`GET /api/interacoes/minhas`). */
-export async function buscarPontosColetados(): Promise<number[]> {
+async function buscarMinhas(): Promise<{ pontosColetados: number[]; pontuacaoTotal: number }> {
   const resposta = await fetch(`${API_URL}/interacoes/minhas`, { headers: cabecalhos() });
 
   if (!resposta.ok) {
@@ -68,5 +67,15 @@ export async function buscarPontosColetados(): Promise<number[]> {
   }
 
   const json = await resposta.json();
-  return (json?.pontosColetados ?? []) as number[];
+  return { pontosColetados: json?.pontosColetados ?? [], pontuacaoTotal: json?.pontuacaoTotal ?? 0 };
+}
+
+/** Ids dos pontos que o usuário logado já coletou (`GET /api/interacoes/minhas`). */
+export async function buscarPontosColetados(): Promise<number[]> {
+  return (await buscarMinhas()).pontosColetados;
+}
+
+/** Pontuação atual do usuário logado — muda fora do check-in (bônus de desafio). */
+export async function buscarPontuacao(): Promise<number> {
+  return (await buscarMinhas()).pontuacaoTotal;
 }
