@@ -195,7 +195,9 @@ function descobrirHost(): string {
 
 export const API_HOST = descobrirHost();
 
-export const API_URL = `http://${API_HOST}:${API_PORT}/api`;
+/** Raiz do servidor — usada para arquivos estáticos, como os modelos 3D (`/modelos/*.glb`). */
+export const SERVER_URL = `http://${API_HOST}:${API_PORT}`;
+export const API_URL = `${SERVER_URL}/api`;
 export const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 
 console.log(`[constants] Backend: ${API_URL}`);

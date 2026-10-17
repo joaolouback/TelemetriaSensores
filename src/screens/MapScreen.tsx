@@ -14,13 +14,17 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Modal,
 } from 'react-native';
 import MapView, { Marker, Circle, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useLiveLocation } from '../hooks/useLiveLocation';
 import { usePontos } from '../hooks/usePontos';
+import { useColetas } from '../hooks/useColetas';
+import { useAuth } from '../contexts/AuthContext';
+import { ARColetaScreen } from './ARColetaScreen';
 import { CAMPUS_UVV, MAP_DEFAULT_DELTA, HOME_COLORS } from '../constants';
 import { formatDistancia, formatNumber } from '../utils';
-import { PontoComDistancia } from '../types';
+import { PontoComDistancia, ResultadoCheckin } from '../types';
 import { MAP_LIGHT_STYLE } from '../constants/mapStyle';
 
 const REGIAO_INICIAL: Region = {
@@ -40,6 +44,22 @@ export function MapScreen() {
     erro: erroPontos,
     recarregar,
   } = usePontos(localizacao);
+
+  const { coletados, marcarColetado } = useColetas();
+  const { atualizarPontuacao } = useAuth();
+  /** Ponto aberto na câmera de AR (null = câmera fechada). */
+  const [pontoAR, setPontoAR] = useState<PontoComDistancia | null>(null);
+
+  // Ponto do raio atual que ainda pode ser coletado — habilita o botão da câmera.
+  const pontoParaColetar = pontosAtivos.find((p) => !coletados.has(p.id)) ?? null;
+
+  const handleColetado = useCallback(
+    (pontoId: number, resultado: ResultadoCheckin) => {
+      marcarColetado(pontoId);
+      atualizarPontuacao(resultado.pontuacaoTotal);
+    },
+    [marcarColetado, atualizarPontuacao]
+  );
 
   const mapRef = useRef<MapView | null>(null);
   const [seguindoUsuario, setSeguindoUsuario] = useState(true);
@@ -137,9 +157,16 @@ export function MapScreen() {
               description={
                 Number.isNaN(ponto.distanciaMetros)
                   ? ponto.descricao ?? ''
-                  : `${formatDistancia(ponto.distanciaMetros)} · ${ponto.pontosRecompensa} pts`
+                  : `${formatDistancia(ponto.distanciaMetros)} · ` +
+                    (coletados.has(ponto.id) ? 'coletado ✓' : `${ponto.pontosRecompensa} pts`)
               }
-              pinColor={ponto.dentroDoRaio ? HOME_COLORS.success : HOME_COLORS.discoverBlue}
+              pinColor={
+                coletados.has(ponto.id)
+                  ? HOME_COLORS.xpGold
+                  : ponto.dentroDoRaio
+                    ? HOME_COLORS.success
+                    : HOME_COLORS.discoverBlue
+              }
               onPress={() => setPontoSelecionado(ponto)}
             />
           </React.Fragment>
@@ -174,8 +201,38 @@ export function MapScreen() {
           <Text style={styles.alertaTexto}>
             Você chegou em {pontosAtivos.map((p) => p.nome).join(', ')}
           </Text>
+          {pontoParaColetar ? (
+            <TouchableOpacity
+              style={styles.botaoAR}
+              onPress={() => setPontoAR(pontoParaColetar)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.botaoARTexto}>
+                📷 Abrir câmera AR · +{pontoParaColetar.pontosRecompensa} pts
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.alertaSubtexto}>Você já coletou o objeto daqui ✓</Text>
+          )}
         </View>
       )}
+
+      <Modal
+        visible={pontoAR !== null}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setPontoAR(null)}
+      >
+        {pontoAR && (
+          <ARColetaScreen
+            ponto={pontoAR}
+            localizacao={localizacao}
+            onFechar={() => setPontoAR(null)}
+            onColetado={handleColetado}
+            onJaColetado={marcarColetado}
+          />
+        )}
+      </Modal>
 
       {erroPontos && (
         <TouchableOpacity style={styles.alertaErro} onPress={recarregar} activeOpacity={0.8}>
@@ -260,6 +317,7 @@ export function MapScreen() {
               </Text>
               <Text style={[styles.chipDistancia, ponto.dentroDoRaio && { color: HOME_COLORS.success }]}>
                 {formatDistancia(ponto.distanciaMetros)}
+                {coletados.has(ponto.id) ? '  ✓' : ''}
               </Text>
             </TouchableOpacity>
           ))}
@@ -342,6 +400,24 @@ const styles = StyleSheet.create({
   alertaTexto: {
     color: '#FFFFFF',
     fontWeight: '700',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  alertaSubtexto: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  botaoAR: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  botaoARTexto: {
+    color: HOME_COLORS.successText,
+    fontWeight: '800',
     fontSize: 14,
     textAlign: 'center',
   },

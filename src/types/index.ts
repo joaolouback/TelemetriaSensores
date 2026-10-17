@@ -86,10 +86,27 @@ export interface SensorState {
 export interface Objeto3D {
   id: number;
   nome: string;
+  /** Absoluta ou relativa ao servidor (ex.: `/modelos/cristal.glb`). */
   assetUrl: string;
-  formato: string;
+  formato: string | null;
   escala: number;
-  pontoId: number;
+  pontoDeInteresseId: number;
+}
+
+export interface Conquista {
+  id: number;
+  titulo: string;
+  descricao: string | null;
+  iconeUrl: string | null;
+  pontosNecessarios: number;
+}
+
+/** Resposta do check-in (`POST /api/interacoes`) quando o objeto é coletado. */
+export interface ResultadoCheckin {
+  distanciaMetros: number;
+  pontosGanhos: number;
+  pontuacaoTotal: number;
+  novasConquistas: Conquista[];
 }
 
 /** Ponto de coleta do campus, vindo da API (`GET /api/pontos`). */

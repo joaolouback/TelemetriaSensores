@@ -17,6 +17,8 @@ interface AuthContextValue {
   entrar: (email: string, senha: string) => Promise<void>;
   cadastrar: (nome: string, email: string, senha: string) => Promise<void>;
   sair: () => Promise<void>;
+  /** Atualiza a pontuação do usuário (ex.: após um check-in) e persiste na sessão. */
+  atualizarPontuacao: (pontuacaoTotal: number) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -65,9 +67,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSessao(null);
   }, []);
 
+  const atualizarPontuacao = useCallback((pontuacaoTotal: number) => {
+    setSessao((atual) => {
+      if (!atual) return atual;
+      const nova = { ...atual, usuario: { ...atual.usuario, pontuacaoTotal } };
+      authService.definirSessaoAtual(nova);
+      salvarSessao(nova).catch((err) => console.error('[Auth] Erro ao salvar pontuação:', err));
+      return nova;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ usuario: sessao?.usuario ?? null, carregando, entrar, cadastrar, sair }}
+      value={{
+        usuario: sessao?.usuario ?? null,
+        carregando,
+        entrar,
+        cadastrar,
+        sair,
+        atualizarPontuacao,
+      }}
     >
       {children}
     </AuthContext.Provider>

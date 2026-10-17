@@ -19,6 +19,16 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Trajeto percorrido**: o caminho é desenhado em tempo real (Polyline).
 - **Ponto mais próximo**: distância ao vivo, calculada no aparelho — funciona sem rede.
 
+### Coleta em Realidade Aumentada (ARCore)
+- **Câmera liberada no raio**: dentro do geofence de um ponto aparece o botão *Abrir câmera AR*.
+- **Objeto 3D no mundo real**: o ARCore (via [ViroReact](https://github.com/ReactVision/viro))
+  detecta o chão e posiciona o modelo 3D do ponto (`Objeto3D` da API, em GLB). Sem superfície
+  detectada em ~8 s, o objeto aparece flutuando à frente da câmera.
+- **Toque para coletar**: só ao tocar no objeto o check-in é enviado (`POST /api/interacoes`).
+  O backend revalida o geofence, credita os pontos uma única vez e devolve as conquistas
+  desbloqueadas.
+- **Pontos coletados**: o marcador fica dourado e a câmera não é mais oferecida naquele ponto.
+
 ### Conta de usuário
 - **Login e registro** (e-mail e senha) validados pelo backend (`/api/auth/*`).
 - A sessão fica salva no SQLite: o app abre já logado, mesmo sem internet.
@@ -62,9 +72,9 @@ src/
 ├── database/       → Abstrações e instâncias CRUD do SQLite
 ├── hooks/          → Hooks de lógica global (sensores, sqlite, coleta, localização, pontos)
 ├── navigation/     → Alternância entre as telas (Mapa / Sensores)
-├── screens/        → Telas principais (MapScreen, DashboardScreen)
+├── screens/        → Telas principais (MapScreen, ARColetaScreen, DashboardScreen)
 ├── sensors/        → Isolamento da lógica de listeners de sensores nativos
-├── services/       → Comunicação com o backend (api, websocket, pontos)
+├── services/       → Comunicação com o backend (api, websocket, pontos, interacoes)
 ├── types/          → Interfaces TypeScript e Enums
 └── utils/          → Funções auxiliares (matemática, formatação, distância)
 ```
@@ -78,14 +88,22 @@ src/
    npm install
    ```
 
-2. Inicie o servidor do Expo:
+2. **Na primeira vez**, com o celular conectado por USB (depuração USB ativada), compile e
+   instale o app — exige o Android Studio instalado:
+   ```bash
+   npm run android
+   ```
+   > O app usa ARCore (código nativo), por isso **não roda no Expo Go**: é um
+   > *development build* (`expo-dev-client`). Só é preciso recompilar ao mudar uma
+   > dependência nativa ou o `app.json`.
+
+3. No dia a dia, inicie o Metro e abra o app **UVV Go** no celular:
    ```bash
    npm start
    ```
 
-3. Abra o **Expo Go** no seu dispositivo Android e escaneie o QR Code.
-
-4. Conceda a **permissão de localização** quando o app solicitar.
+4. Conceda a **permissão de localização** quando o app solicitar (a de câmera é pedida
+   na primeira coleta em AR).
 
 O celular e o computador precisam estar na **mesma rede Wi-Fi**.
 
@@ -104,9 +122,10 @@ EXPO_PUBLIC_API_PORT=3000
 
 ## 🗺️ Sobre o mapa
 
-O mapa usa o Google Maps através do `react-native-maps`. **No Expo Go funciona sem
-configuração**. Para gerar um APK instalável será necessária uma chave do Google Maps
-em `app.json` (`android.config.googleMaps.apiKey`) — hoje há um placeholder ali.
+O mapa usa o Google Maps através do `react-native-maps`. Como o app não roda mais no
+Expo Go, é **obrigatório** ter uma chave do Google Maps (Maps SDK for Android) em
+`app.json` (`android.config.googleMaps.apiKey`) — sem ela o mapa abre cinza. Hoje há um
+placeholder ali; veja o passo 3.2 do `SETUP.md`.
 
 As coordenadas dos 10 pontos ainda são **aproximadas**, definidas no seed do backend
 (`prisma/seed.ts`), à espera da coleta em campo. Testando fora do campus, os pontos

@@ -23,14 +23,16 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
           "apiKey": "COLOQUE_SUA_CHAVE_DO_GOOGLE_MAPS_AQUI"
         }
-      }
+      },
+      "package": "br.uvv.uvvgo"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,7 +44,19 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Permitir que o SensorTelemetryApp acesse sua localização para coleta de telemetria."
         }
+      ],
+      "expo-dev-client",
+      [
+        "@reactvision/react-viro",
+        {
+          "android": {
+            "xRMode": [
+              "AR"
+            ]
+          }
+        }
       ]
-    ]
+    ],
+    "newArchEnabled": true
   }
 }
