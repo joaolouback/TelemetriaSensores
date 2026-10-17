@@ -1,9 +1,10 @@
 /**
  * Placar compacto do desafio em andamento, exibido sobre o mapa:
- * "⚔️ Você 1/3 × 2/3 Bruno · 42:10".
+ * "Você 1/3 × 2/3 Bruno · 42:10".
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Desafio } from '../types';
 import { useTempoRestante } from '../hooks/useTempoRestante';
 
@@ -20,13 +21,23 @@ export function PlacarDesafio({ desafio, ajusteRelogio }: Props) {
   const total = desafio.pontos.length;
   const nomeOponente = desafio.oponente?.nome.trim().split(/\s+/)[0] ?? 'Oponente';
 
+  const meus = desafio.eu.coletados.length;
+  const dele = desafio.oponente?.coletados.length ?? 0;
+  const acabando = restanteMs < 5 * 60 * 1000;
+
   return (
-    <View style={styles.placar}>
+    <View
+      style={styles.placar}
+      accessible
+      accessibilityRole="summary"
+      accessibilityLabel={`Desafio: você ${meus} de ${total}, ${nomeOponente} ${dele} de ${total}. Tempo restante ${texto}`}
+    >
+      <Ionicons name="flash" size={16} color="#FFFFFF" />
       <Text style={styles.texto} numberOfLines={1}>
-        ⚔️ Você {desafio.eu.coletados.length}/{total} × {desafio.oponente?.coletados.length ?? 0}/{total}{' '}
-        {nomeOponente}
+        Você {meus}/{total} × {dele}/{total} {nomeOponente}
       </Text>
-      <Text style={[styles.tempo, restanteMs < 5 * 60 * 1000 && styles.tempoAcabando]}>⏱ {texto}</Text>
+      <Ionicons name="timer-outline" size={16} color={acabando ? '#FEF08A' : '#FFFFFF'} />
+      <Text style={[styles.tempo, acabando && styles.tempoAcabando]}>{texto}</Text>
     </View>
   );
 }
@@ -35,7 +46,7 @@ const styles = StyleSheet.create({
   placar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
     backgroundColor: COR_DESAFIO,
     borderRadius: 12,
     paddingVertical: 9,
@@ -47,7 +58,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 14,
-    marginRight: 8,
+    marginRight: 4,
   },
   tempo: {
     color: '#FFFFFF',

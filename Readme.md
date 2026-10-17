@@ -129,6 +129,24 @@ src/
 
 O celular e o computador precisam estar na **mesma rede Wi-Fi**.
 
+## ✅ Qualidade
+
+| Script | O que faz |
+| --- | --- |
+| `npm run lint` | ESLint com as regras oficiais do Expo (`eslint-config-expo`) |
+| `npm run typecheck` | TypeScript sem gerar arquivos |
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda os dois a cada push e PR.
+
+Outros cuidados do app:
+- **Bateria:** o GPS de alta frequência do mapa só fica ligado com a aba *Mapa* visível.
+- **Área segura:** cabeçalhos, barra de abas e câmera AR respeitam a barra de status, o
+  entalhe e a barra de navegação de cada aparelho (`react-native-safe-area-context`).
+- **Erros:** um *error boundary* mostra "Algo deu errado · Tentar de novo" em vez de tela branca.
+- **Logs:** `logDebug` só imprime em desenvolvimento.
+- **Acessibilidade:** botões, abas e placares têm papel e descrição para o leitor de tela (TalkBack).
+- **Vibração:** ao coletar, ao errar a coleta e nos momentos do desafio (`expo-haptics`).
+
 ## 🔌 Conexão com o backend
 
 O endereço da API é **descoberto automaticamente**: o app usa o IP da máquina que está

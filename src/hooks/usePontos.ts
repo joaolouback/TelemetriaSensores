@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PontoDeInteresse, PontoComDistancia, LocationData } from '../types';
 import { buscarPontos } from '../services/pontos';
 import { distanciaEmMetros } from '../utils';
+import { logDebug } from '../utils/log';
 
 export function usePontos(localizacao: LocationData | null) {
   const [pontos, setPontos] = useState<PontoDeInteresse[]>([]);
@@ -22,7 +23,7 @@ export function usePontos(localizacao: LocationData | null) {
     try {
       const dados = await buscarPontos();
       setPontos(dados);
-      console.log(`[usePontos] ${dados.length} pontos carregados da API.`);
+      logDebug(`[usePontos] ${dados.length} pontos carregados da API.`);
     } catch (e) {
       console.warn('[usePontos] Falha ao buscar pontos:', e);
       setErro('Não foi possível carregar os pontos do campus. Verifique se a API está rodando.');

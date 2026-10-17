@@ -5,8 +5,9 @@
  * e a curiosidade do ponto (cadastradas no seed da API), além dos pontos
  * ganhos, das conquistas e do progresso no desafio 1x1.
  */
-import React from 'react';
-import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { HOME_COLORS } from '../constants';
 import { PontoDeInteresse, ResultadoCheckin } from '../types';
 import { urlDoServidor } from '../utils/url';
@@ -19,9 +20,20 @@ interface Props {
 
 export function CardLocal({ ponto, resultado, onFechar }: Props) {
   const { desafio } = resultado;
+  const venceu = desafio?.resultado === 'vitoria';
+
+  // Entrada com "pulo": o card surge crescendo, como uma recompensa.
+  const entrada = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(entrada, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }).start();
+  }, [entrada]);
+  const animacao = {
+    opacity: entrada,
+    transform: [{ scale: entrada.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+  };
 
   return (
-    <View style={styles.cartao}>
+    <Animated.View style={[styles.cartao, animacao]}>
       <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
         {ponto.imagemUrl ? (
           <Image source={{ uri: urlDoServidor(ponto.imagemUrl) }} style={styles.foto} resizeMode="cover" />
@@ -40,35 +52,40 @@ export function CardLocal({ ponto, resultado, onFechar }: Props) {
         </View>
 
         {desafio && (
-          <View style={[styles.desafio, desafio.resultado === 'vitoria' && styles.desafioVitoria]}>
+          <View style={[styles.linhaIcone, styles.desafio, venceu && styles.desafioVitoria]}>
+            <Ionicons name={venceu ? 'trophy' : 'flash'} size={18} color={venceu ? '#B45309' : HOME_COLORS.accent} />
             <Text style={styles.desafioTexto}>
-              {desafio.resultado === 'vitoria'
-                ? `🏆 Você venceu o desafio! +${desafio.bonus} pontos de bônus`
-                : `⚔️ Desafio: ${desafio.coletados} de ${desafio.total} pontos coletados`}
+              {venceu
+                ? `Você venceu o desafio! +${desafio.bonus} pontos de bônus`
+                : `Desafio: ${desafio.coletados} de ${desafio.total} pontos coletados`}
             </Text>
           </View>
         )}
 
         {resultado.novasConquistas.map((c) => (
-          <Text key={c.id} style={styles.conquista}>
-            🏅 Conquista desbloqueada: {c.titulo}
-          </Text>
+          <View key={c.id} style={[styles.linhaIcone, styles.conquista]}>
+            <Ionicons name="ribbon" size={18} color={HOME_COLORS.xpGold} />
+            <Text style={styles.conquistaTexto}>Conquista desbloqueada: {c.titulo}</Text>
+          </View>
         ))}
 
         {ponto.descricao ? <Text style={styles.descricao}>{ponto.descricao}</Text> : null}
 
         {ponto.curiosidade ? (
           <View style={styles.curiosidade}>
-            <Text style={styles.curiosidadeRotulo}>💡 Você sabia?</Text>
+            <View style={styles.linhaIcone}>
+              <Ionicons name="bulb" size={16} color={HOME_COLORS.xpGold} />
+              <Text style={styles.curiosidadeRotulo}>Você sabia?</Text>
+            </View>
             <Text style={styles.curiosidadeTexto}>{ponto.curiosidade}</Text>
           </View>
         ) : null}
       </ScrollView>
 
-      <TouchableOpacity style={styles.botao} onPress={onFechar} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.botao} onPress={onFechar} activeOpacity={0.85} accessibilityRole="button">
         <Text style={styles.botaoTexto}>Voltar ao mapa</Text>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -125,6 +142,11 @@ const styles = StyleSheet.create({
     color: HOME_COLORS.textSecondary,
     backgroundColor: HOME_COLORS.background,
   },
+  linhaIcone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   desafio: {
     marginTop: 12,
     padding: 10,
@@ -135,16 +157,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
   },
   desafioTexto: {
+    flex: 1,
     color: HOME_COLORS.accent,
     fontSize: 14,
     fontWeight: '800',
-    textAlign: 'center',
   },
   conquista: {
+    marginTop: 10,
+  },
+  conquistaTexto: {
+    flex: 1,
     color: HOME_COLORS.accent,
     fontSize: 14,
     fontWeight: '700',
-    marginTop: 10,
   },
   descricao: {
     color: HOME_COLORS.textSecondary,
@@ -164,9 +189,9 @@ const styles = StyleSheet.create({
     color: HOME_COLORS.textPrimary,
     fontSize: 13,
     fontWeight: '800',
-    marginBottom: 4,
   },
   curiosidadeTexto: {
+    marginTop: 4,
     color: HOME_COLORS.textSecondary,
     fontSize: 14,
     lineHeight: 20,

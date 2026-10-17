@@ -15,16 +15,19 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { HOME_COLORS } from '../constants';
 import { useTelemetria } from '../contexts/TelemetriaContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ITENS = [
-  { icone: '📍', titulo: 'Localização (GPS)', texto: 'A cada 30 segundos, enquanto o app está aberto.' },
-  { icone: '📱', titulo: 'Movimento do aparelho', texto: 'Leituras do acelerômetro.' },
-  { icone: '🔋', titulo: 'Bateria e rede', texto: 'Nível de bateria e tipo de conexão (Wi-Fi ou dados).' },
+  { icone: 'location' as const, titulo: 'Localização (GPS)', texto: 'A cada 30 segundos, enquanto o app está aberto.' },
+  { icone: 'phone-portrait' as const, titulo: 'Movimento do aparelho', texto: 'Leituras do acelerômetro.' },
+  { icone: 'battery-half' as const, titulo: 'Bateria e rede', texto: 'Nível de bateria e tipo de conexão (Wi-Fi ou dados).' },
 ];
 
 export function ConsentimentoScreen() {
+  const insets = useSafeAreaInsets();
   const { definirConsentimento } = useTelemetria();
   const [salvando, setSalvando] = useState<'sim' | 'nao' | null>(null);
 
@@ -42,9 +45,11 @@ export function ConsentimentoScreen() {
       <StatusBar barStyle="light-content" backgroundColor={HOME_COLORS.accent} />
 
       <ScrollView contentContainerStyle={styles.conteudo}>
-        <View style={styles.hero}>
-          <Text style={styles.heroIcone}>🔒</Text>
-          <Text style={styles.heroTitulo}>Sua privacidade</Text>
+        <View style={[styles.hero, { paddingTop: insets.top + 40 }]}>
+          <Ionicons name="shield-checkmark" size={44} color="#FFFFFF" style={styles.heroIcone} />
+          <Text style={styles.heroTitulo} accessibilityRole="header">
+            Sua privacidade
+          </Text>
           <Text style={styles.heroTexto}>
             O UVV Go faz parte de um Trabalho de Conclusão de Curso. Com a sua permissão, o app
             registra dados dos sensores para avaliar o desempenho do jogo no campus.
@@ -55,7 +60,7 @@ export function ConsentimentoScreen() {
           <Text style={styles.secao}>O que é coletado</Text>
           {ITENS.map((item) => (
             <View key={item.titulo} style={styles.item}>
-              <Text style={styles.itemIcone}>{item.icone}</Text>
+              <Ionicons name={item.icone} size={22} color={HOME_COLORS.discoverBlue} style={styles.itemIcone} />
               <View style={styles.itemTextos}>
                 <Text style={styles.itemTitulo}>{item.titulo}</Text>
                 <Text style={styles.itemTexto}>{item.texto}</Text>
@@ -83,6 +88,7 @@ export function ConsentimentoScreen() {
           onPress={() => responder(true)}
           disabled={salvando !== null}
           activeOpacity={0.85}
+          accessibilityRole="button"
         >
           {salvando === 'sim' ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -96,6 +102,7 @@ export function ConsentimentoScreen() {
           onPress={() => responder(false)}
           disabled={salvando !== null}
           activeOpacity={0.7}
+          accessibilityRole="button"
         >
           {salvando === 'nao' ? (
             <ActivityIndicator color={HOME_COLORS.textSecondary} />
@@ -118,13 +125,11 @@ const styles = StyleSheet.create({
   },
   hero: {
     backgroundColor: HOME_COLORS.accent,
-    paddingTop: 64,
     paddingBottom: 48,
     paddingHorizontal: 24,
     alignItems: 'center',
   },
   heroIcone: {
-    fontSize: 40,
     marginBottom: 8,
   },
   heroTitulo: {
@@ -162,7 +167,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   itemIcone: {
-    fontSize: 20,
     width: 32,
   },
   itemTextos: {

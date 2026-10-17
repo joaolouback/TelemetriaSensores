@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { HOME_COLORS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { usePontos } from '../hooks/usePontos';
@@ -22,6 +23,7 @@ import { useColetas } from '../hooks/useColetas';
 import { obterIniciais } from '../utils';
 import { calcularNivel } from '../utils/nivel';
 import { CardDesafio } from '../components/CardDesafio';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DISCOVER_CARD_WIDTH = (SCREEN_WIDTH - 48 - 12) / 2; // padding + gap
@@ -36,6 +38,7 @@ function getSaudacao(): string {
 }
 
 export function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const { usuario } = useAuth();
   const { pontos } = usePontos(null);
   const { coletados } = useColetas();
@@ -67,7 +70,7 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ─── Header / Saudação ─── */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
           <View>
             <Text style={styles.saudacao}>{getSaudacao()},</Text>
             <Text style={styles.nome}>{user.nome}! 👋</Text>
@@ -124,7 +127,11 @@ export function HomeScreen() {
             return (
               <View key={ponto.id} style={styles.missaoCard}>
                 <View style={[styles.missaoIcone, concluida && styles.missaoIconeConcluida]}>
-                  <Text style={styles.missaoIconeTexto}>{concluida ? '✅' : '💎'}</Text>
+                  <Ionicons
+                    name={concluida ? 'checkmark-circle' : 'diamond'}
+                    size={22}
+                    color={concluida ? HOME_COLORS.success : HOME_COLORS.xpGold}
+                  />
                 </View>
                 <View style={styles.missaoTextos}>
                   <Text style={[styles.missaoTitulo, concluida && styles.missaoTituloConcluida]}>
@@ -195,7 +202,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 56,
     paddingBottom: 20,
   },
   saudacao: {
@@ -347,9 +353,6 @@ const styles = StyleSheet.create({
   },
   missaoIconeConcluida: {
     backgroundColor: HOME_COLORS.successBg,
-  },
-  missaoIconeTexto: {
-    fontSize: 20,
   },
   missaoTextos: {
     flex: 1,

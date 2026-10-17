@@ -17,6 +17,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { HOME_COLORS } from '../constants';
 import { useDesafio } from '../contexts/DesafioContext';
 import { useTempoRestante } from '../hooks/useTempoRestante';
@@ -87,7 +88,7 @@ function SemDesafio(props: { ocupado: boolean; onCriar: () => void; onEntrar: (c
 
   return (
     <>
-      <Text style={styles.titulo}>⚔️ Desafio 1x1</Text>
+      <Titulo icone="flash">Desafio 1x1</Titulo>
       <Text style={styles.texto}>
         Desafie um amigo: 3 pontos sorteados, 1 hora de prazo. Quem coletar todos primeiro ganha +20 pontos.
       </Text>
@@ -104,6 +105,7 @@ function SemDesafio(props: { ocupado: boolean; onCriar: () => void; onEntrar: (c
             autoCorrect={false}
             maxLength={6}
             autoFocus
+            accessibilityLabel="Código do desafio, 6 caracteres"
           />
           <Botao
             texto="Entrar"
@@ -134,7 +136,7 @@ function Aguardando(props: { desafio: Desafio; ajusteRelogio: number; ocupado: b
 
   return (
     <>
-      <Text style={styles.titulo}>⚔️ Esperando seu adversário</Text>
+      <Titulo icone="hourglass-outline">Esperando seu adversário</Titulo>
       <Text style={styles.texto}>Mande este código para quem você quer desafiar:</Text>
       <Text style={styles.codigo} selectable>
         {desafio.codigo}
@@ -158,7 +160,7 @@ function EmAndamento(props: { desafio: Desafio; ajusteRelogio: number; onDesisti
   return (
     <>
       <View style={styles.cabecalho}>
-        <Text style={styles.titulo}>⚔️ Você × {oponente}</Text>
+        <Titulo icone="flash">Você × {oponente}</Titulo>
         <Text style={styles.tempo}>⏱ {texto}</Text>
       </View>
       <Text style={styles.texto}>Os pontos do desafio estão em laranja no mapa.</Text>
@@ -176,13 +178,13 @@ function EmAndamento(props: { desafio: Desafio; ajusteRelogio: number; onDesisti
             <Text style={styles.celulaPonto} numberOfLines={1}>
               {p.nome}
             </Text>
-            <Text style={styles.celula}>{meus.has(p.id) ? '✅' : '⬜'}</Text>
-            <Text style={styles.celula}>{dele.has(p.id) ? '✅' : '⬜'}</Text>
+            <Marca feito={meus.has(p.id)} quem="Você" />
+            <Marca feito={dele.has(p.id)} quem={oponente} />
           </View>
         ))}
       </View>
 
-      <TouchableOpacity onPress={props.onDesistir} activeOpacity={0.7}>
+      <TouchableOpacity onPress={props.onDesistir} activeOpacity={0.7} accessibilityRole="button" hitSlop={8}>
         <Text style={styles.desistir}>Desistir</Text>
       </TouchableOpacity>
     </>
@@ -195,22 +197,48 @@ function Resultado(props: { desafio: Desafio; onFechar: () => void }) {
   const placar = `${desafio.eu.coletados.length}/${total} × ${desafio.oponente?.coletados.length ?? 0}/${total}`;
   const oponente = primeiroNome(desafio.oponente?.nome);
 
-  const [titulo, texto] =
+  const [icone, titulo, texto]: [keyof typeof Ionicons.glyphMap, string, string] =
     desafio.resultado === 'vitoria'
-      ? ['🏆 Vitória!', `Você venceu ${oponente} e ganhou +${desafio.bonusVitoria} pontos.`]
+      ? ['trophy', 'Vitória!', `Você venceu ${oponente} e ganhou +${desafio.bonusVitoria} pontos.`]
       : desafio.resultado === 'derrota'
-        ? ['😓 Não foi dessa vez', `${oponente} venceu o desafio. Que tal uma revanche?`]
-        : ['🤝 Empate', 'O tempo acabou com os dois empatados.'];
+        ? ['sad-outline', 'Não foi dessa vez', `${oponente} venceu o desafio. Que tal uma revanche?`]
+        : ['people-outline', 'Empate', 'O tempo acabou com os dois empatados.'];
 
   return (
     <>
-      <Text style={styles.titulo}>{titulo}</Text>
+      <Titulo icone={icone}>{titulo}</Titulo>
       <Text style={styles.texto}>{texto}</Text>
-      <Text style={styles.placarFinal}>{placar}</Text>
+      <Text style={styles.placarFinal} accessibilityLabel={`Placar final: você ${desafio.eu.coletados.length}, ${oponente} ${desafio.oponente?.coletados.length ?? 0}`}>
+        {placar}
+      </Text>
       <View style={styles.botoes}>
         <Botao texto="Fechar" onPress={props.onFechar} secundario />
       </View>
     </>
+  );
+}
+
+function Titulo({ icone, children }: { icone: keyof typeof Ionicons.glyphMap; children: React.ReactNode }) {
+  return (
+    <View style={styles.tituloLinha}>
+      <Ionicons name={icone} size={20} color={COR_DESAFIO} />
+      <Text style={styles.titulo} accessibilityRole="header">
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+/** Célula da tabela: coletado ou não, com descrição para o leitor de tela. */
+function Marca({ feito, quem }: { feito: boolean; quem: string }) {
+  return (
+    <View style={styles.celula} accessibilityLabel={`${quem}: ${feito ? 'coletado' : 'falta coletar'}`}>
+      <Ionicons
+        name={feito ? 'checkmark-circle' : 'ellipse-outline'}
+        size={20}
+        color={feito ? HOME_COLORS.success : HOME_COLORS.textMuted}
+      />
+    </View>
   );
 }
 
@@ -234,6 +262,9 @@ function Botao(props: {
       onPress={props.onPress}
       disabled={inativo}
       activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={props.texto}
+      accessibilityState={{ disabled: !!inativo, busy: !!props.ocupado }}
     >
       {props.ocupado ? (
         <ActivityIndicator color={props.secundario ? COR_DESAFIO : '#FFFFFF'} />
@@ -259,7 +290,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  tituloLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
   titulo: {
+    flexShrink: 1,
     color: HOME_COLORS.textPrimary,
     fontSize: 17,
     fontWeight: '800',
@@ -367,8 +405,7 @@ const styles = StyleSheet.create({
   },
   celula: {
     width: 64,
-    textAlign: 'center',
-    fontSize: 15,
+    alignItems: 'center',
   },
   desistir: {
     color: HOME_COLORS.textMuted,

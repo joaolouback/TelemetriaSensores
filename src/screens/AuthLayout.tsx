@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HOME_COLORS } from '../constants';
 import { useTelemetria } from '../contexts/TelemetriaContext';
 import { CollectionStatus } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AuthLayoutProps {
   titulo: string;
@@ -31,6 +32,7 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }: AuthLayoutProps) {
+  const insets = useSafeAreaInsets();
   const { status, consentimento } = useTelemetria();
   const coletando = status === CollectionStatus.COLLECTING;
 
@@ -46,7 +48,7 @@ export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }:
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
+        <View style={[styles.hero, { paddingTop: insets.top + 40 }]}>
           <View style={styles.logo}>
             <Ionicons name="location" size={30} color={HOME_COLORS.xpGold} />
           </View>
@@ -115,7 +117,6 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: HOME_COLORS.accent,
     alignItems: 'center',
-    paddingTop: 64,
     paddingBottom: 72,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,

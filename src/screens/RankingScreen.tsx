@@ -10,6 +10,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { HOME_COLORS } from '../constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RANKING_MOCK = [
   { posicao: 1, nome: 'Lucas Silva', xp: 8450, nivel: 9, avatar: 'LS', destaque: false },
@@ -23,6 +24,7 @@ const RANKING_MOCK = [
 ];
 
 export function RankingScreen() {
+  const insets = useSafeAreaInsets();
   const top3 = RANKING_MOCK.slice(0, 3);
   const resto = RANKING_MOCK.slice(3);
 
@@ -30,7 +32,7 @@ export function RankingScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={HOME_COLORS.background} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
         <Text style={styles.headerTitulo}>Ranking do Campus 🏆</Text>
         <Text style={styles.headerSubtitulo}>Os maiores exploradores da UVV</Text>
       </View>
@@ -118,7 +120,6 @@ const styles = StyleSheet.create({
     backgroundColor: HOME_COLORS.background,
   },
   header: {
-    paddingTop: 56,
     paddingBottom: 16,
     paddingHorizontal: 20,
     backgroundColor: HOME_COLORS.background,

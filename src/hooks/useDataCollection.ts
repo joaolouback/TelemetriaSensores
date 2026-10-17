@@ -6,6 +6,7 @@ import { SAVE_INTERVAL_MS } from '../constants';
 import { syncLogsWithApi } from '../services/api';
 import { getUsuarioId } from '../services/auth';
 import { wsService } from '../services/websocket';
+import { logDebug } from '../utils/log';
 
 interface UseDataCollectionOptions {
   sensorState: SensorState;
@@ -47,7 +48,7 @@ export function useDataCollection({ sensorState, onSaved }: UseDataCollectionOpt
         setSaveCount((prev) => prev + 1);
         onSaved?.();
       } else {
-        console.log('[useDataCollection] Aguardando GPS — leitura não gravada.');
+        logDebug('[useDataCollection] Aguardando GPS — leitura não gravada.');
       }
 
       // Tenta enviar pendentes mesmo sem gravar agora (ex.: a rede acabou de voltar).

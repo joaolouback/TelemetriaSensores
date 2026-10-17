@@ -12,6 +12,7 @@ import {
   Alert,
   Switch,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { HOME_COLORS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelemetria } from '../contexts/TelemetriaContext';
@@ -21,6 +22,7 @@ import { useColetas } from '../hooks/useColetas';
 import { useDesafio } from '../contexts/DesafioContext';
 import { buscarPlacarDesafios } from '../services/desafios';
 import { PlacarDesafios } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CONQUISTAS_MOCK = [
   { id: 1, titulo: 'Primeiro Passo', desc: 'Fez check-in no mapa', icone: '📍' },
@@ -30,6 +32,7 @@ const CONQUISTAS_MOCK = [
 ];
 
 export function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { usuario, sair } = useAuth();
   const { consentimento, definirConsentimento } = useTelemetria();
   const { coletados } = useColetas();
@@ -82,7 +85,7 @@ export function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header Perfil */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
           <View style={styles.avatarGrande}>
             <Text style={styles.avatarTexto}>{user.iniciais}</Text>
           </View>
@@ -91,7 +94,7 @@ export function ProfileScreen() {
           <Text style={styles.email}>{usuario?.email}</Text>
           {placar && placar.vitorias + placar.derrotas + placar.empates > 0 && (
             <Text style={styles.placarDesafios}>
-              ⚔️ Desafios: {placar.vitorias} {placar.vitorias === 1 ? 'vitória' : 'vitórias'} ·{' '}
+              Desafios: {placar.vitorias} {placar.vitorias === 1 ? 'vitória' : 'vitórias'} ·{' '}
               {placar.derrotas} {placar.derrotas === 1 ? 'derrota' : 'derrotas'} · {placar.empates}{' '}
               {placar.empates === 1 ? 'empate' : 'empates'}
             </Text>
@@ -132,8 +135,9 @@ export function ProfileScreen() {
         {/* OPÇÕES */}
         <View style={styles.opcoesContainer}>
           <View style={[styles.opcaoItem, styles.opcaoLinha]}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={HOME_COLORS.discoverBlue} style={styles.opcaoIcone} />
             <View style={styles.opcaoTextos}>
-              <Text style={styles.opcaoTexto}>🔒 Compartilhar telemetria</Text>
+              <Text style={styles.opcaoTexto}>Compartilhar telemetria</Text>
               <Text style={styles.opcaoDescricao}>
                 GPS, movimento e bateria para a pesquisa do TCC
               </Text>
@@ -143,20 +147,17 @@ export function ProfileScreen() {
               onValueChange={alternarTelemetria}
               trackColor={{ true: HOME_COLORS.discoverBlue, false: HOME_COLORS.cardBorder }}
               thumbColor="#FFFFFF"
+              accessibilityLabel="Compartilhar telemetria para a pesquisa do TCC"
             />
           </View>
-          <TouchableOpacity style={styles.opcaoItem} activeOpacity={0.7}>
-            <Text style={styles.opcaoTexto}>⚙️ Configurações da Conta</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.opcaoItem} activeOpacity={0.7}>
-            <Text style={styles.opcaoTexto}>🔔 Notificações</Text>
-          </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.opcaoItem, { borderBottomWidth: 0 }]}
+            style={[styles.opcaoItem, styles.opcaoLinha, { borderBottomWidth: 0 }]}
             activeOpacity={0.7}
             onPress={confirmarSaida}
+            accessibilityRole="button"
           >
-            <Text style={[styles.opcaoTexto, { color: '#EF4444' }]}>🚪 Sair da Conta</Text>
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" style={styles.opcaoIcone} />
+            <Text style={[styles.opcaoTexto, { color: '#EF4444' }]}>Sair da conta</Text>
           </TouchableOpacity>
         </View>
 
@@ -180,7 +181,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 56,
     paddingBottom: 20,
   },
   avatarGrande: {
@@ -306,6 +306,9 @@ const styles = StyleSheet.create({
   opcaoLinha: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  opcaoIcone: {
+    marginRight: 12,
   },
   opcaoTextos: {
     flex: 1,

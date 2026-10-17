@@ -15,8 +15,10 @@ import { useTelemetria } from '../contexts/TelemetriaContext';
 import { CollectionStatus } from '../types';
 import { COLORS } from '../constants';
 import { formatNumber, formatBatteryLevel, formatTimestamp, getNetworkLabel } from '../utils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function DashboardScreen() {
+  const insets = useSafeAreaInsets();
   // A coleta é iniciada automaticamente no TelemetriaProvider; aqui só exibimos
   // os dados e permitimos pausar/retomar manualmente.
   const {
@@ -80,9 +82,9 @@ export function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
         <Text style={styles.headerTitle}>Telemetria Sensores</Text>
         <StatusBadge
           label={isCollecting ? 'Coletando' : status === CollectionStatus.STOPPED ? 'Parado' : 'Inativo'}
@@ -240,7 +242,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 56,
     paddingBottom: 16,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,

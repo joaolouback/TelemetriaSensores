@@ -20,6 +20,7 @@ import {
   salvarConsentimentoTelemetria,
   deleteUnsyncedLogs,
 } from '../database/database';
+import { logDebug } from '../utils/log';
 
 type TelemetriaContextValue = ReturnType<typeof useSensors> &
   ReturnType<typeof useDatabase> &
@@ -83,10 +84,10 @@ export function TelemetriaProvider({ children }: { children: React.ReactNode }) 
       .then(async (salvo) => {
         setConsentimento(salvo);
         if (salvo) {
-          console.log('[Telemetria] Consentimento dado — iniciando coleta automática.');
+          logDebug('[Telemetria] Consentimento dado — iniciando coleta automática.');
           await iniciar();
         } else {
-          console.log('[Telemetria] Sem consentimento — coleta desligada.');
+          logDebug('[Telemetria] Sem consentimento — coleta desligada.');
         }
       })
       .catch((err) => console.error('[Telemetria] Falha ao iniciar coleta:', err));

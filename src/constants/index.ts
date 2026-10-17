@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+import { logDebug } from '../utils/log';
 
 /** Constantes globais do sistema, incluindo cores, intervalos e URLs da API */
 export const GPS_INTERVAL_MS = 30_000;
@@ -35,34 +37,37 @@ export const SESSION_TABLE_NAME = 'sessao';
 
 
 
+/**
+ * Cores da aba Sensores (painel de telemetria). Tema claro, igual ao resto do app
+ * (`HOME_COLORS`); as cores de cada sensor são mais escuras para contrastar com o branco.
+ */
 export const COLORS = {
-  primary: '#6C63FF',
-  primaryLight: '#A5A0FF',
-  primaryDark: '#4B44CC',
+  primary: '#3B5BDB',
+  primaryLight: '#EEF2FF',
+  primaryDark: '#1B2B5E',
 
-  background: '#0F0F1A',
-  surface: '#1A1A2E',
-  surfaceLight: '#24243E',
-  surfaceElevated: '#2E2E4A',
+  background: '#F5F6FA',
+  surface: '#FFFFFF',
+  surfaceLight: '#F9FAFB',
+  surfaceElevated: '#E5E7EB',
 
+  textPrimary: '#1A1A2E',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
 
-  textPrimary: '#EAEAF0',
-  textSecondary: '#9090A7',
-  textMuted: '#5E5E78',
+  success: '#059669',
+  warning: '#D97706',
+  danger: '#DC2626',
+  info: '#0284C7',
 
-  success: '#00D68F',
-  warning: '#FFB547',
-  danger: '#FF6B6B',
-  info: '#4EC5F1',
+  gps: '#0284C7',
+  accelerometer: '#D97706',
+  battery: '#059669',
+  connectivity: '#7C3AED',
+  storage: '#DB2777',
 
-  gps: '#4EC5F1',
-  accelerometer: '#FFB547',
-  battery: '#00D68F',
-  connectivity: '#6C63FF',
-  storage: '#FF6B9D',
-
-  border: '#2A2A44',
-  cardShadow: 'rgba(0, 0, 0, 0.3)',
+  border: '#E8EAF0',
+  cardShadow: 'rgba(0, 0, 0, 0.06)',
 } as const;
 
 /** Cores do tema claro para a HomeScreen gamificada */
@@ -120,7 +125,6 @@ export const SENSOR_TYPES = {
  *   EXPO_PUBLIC_API_HOST=192.168.0.42
  *   EXPO_PUBLIC_API_PORT=3000
  */
-import Constants from 'expo-constants';
 
 export const API_PORT = process.env.EXPO_PUBLIC_API_PORT ?? '3000';
 
@@ -154,5 +158,5 @@ export const SERVER_URL = `http://${API_HOST}:${API_PORT}`;
 export const API_URL = `${SERVER_URL}/api`;
 export const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 
-console.log(`[constants] Backend: ${API_URL}`);
+logDebug(`[constants] Backend: ${API_URL}`);
 

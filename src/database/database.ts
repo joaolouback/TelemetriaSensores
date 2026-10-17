@@ -2,6 +2,7 @@
 import * as SQLite from 'expo-sqlite';
 import { DATABASE_NAME, TABLE_NAME, LEGACY_TABLE_NAME, SESSION_TABLE_NAME } from '../constants';
 import { SensorLog, Sessao } from '../types';
+import { logDebug } from '../utils/log';
 
 let db: SQLite.SQLiteDatabase | null = null;
 // Guarda a inicialização em andamento: AuthProvider e TelemetriaProvider chamam
@@ -83,7 +84,7 @@ async function migrarTabelaLegada(database: SQLite.SQLiteDatabase): Promise<void
     `);
   });
 
-  console.log(`[DB] Tabela ${LEGACY_TABLE_NAME} migrada para ${TABLE_NAME}.`);
+  logDebug(`[DB] Tabela ${LEGACY_TABLE_NAME} migrada para ${TABLE_NAME}.`);
 }
 
 
@@ -205,19 +206,11 @@ export async function markLogsAsSynced(ids: number[]): Promise<void> {
   const database = getDatabase();
   const placeholders = ids.map(() => '?').join(',');
 
-  console.log(`[DB] Executando UPDATE: marcando IDs ${ids.join(',')} como sincronizados.`);
-
-  await database.runAsync(
+  const { changes } = await database.runAsync(
     `UPDATE ${TABLE_NAME} SET synced = 1 WHERE id IN (${placeholders})`,
     ids
   );
-
-  // Verificação rápida
-  const check = await database.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM ${TABLE_NAME} WHERE id IN (${placeholders}) AND synced = 1`,
-    ids
-  );
-  console.log(`[DB] Verificação: ${check?.count} registros agora estão com synced=1.`);
+  logDebug(`[DB] ${changes} registros marcados como sincronizados.`);
 }
 
 

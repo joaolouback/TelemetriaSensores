@@ -34,8 +34,11 @@ import {
 import { HOME_COLORS } from '../constants';
 import { CardLocal } from '../components/CardLocal';
 import { urlDoServidor } from '../utils/url';
+import { vibrarSucesso, vibrarErro } from '../utils/vibracao';
+import { Ionicons } from '@expo/vector-icons';
 import { registrarCheckin, CheckinError } from '../services/interacoes';
 import { LocationData, PontoComDistancia, ResultadoCheckin } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** Tempo procurando o chão antes de mostrar o objeto flutuando. */
 const TEMPO_BUSCA_SUPERFICIE_MS = 8_000;
@@ -161,6 +164,7 @@ export function ARColetaScreen({
   jaColetado,
   valeNoDesafio,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [fase, setFase] = useState<Fase>('verificando');
   const [rastreando, setRastreando] = useState(false);
   const [flutuante, setFlutuante] = useState(false);
@@ -226,11 +230,13 @@ export function ARColetaScreen({
 
     try {
       const res = await registrarCheckin(ponto.id, posicao);
+      vibrarSucesso();
       setResultado(res);
       setFase('coletado');
       onColetado(ponto.id, res);
     } catch (e) {
       const erro = e instanceof CheckinError ? e : new CheckinError('Não foi possível coletar o objeto.');
+      vibrarErro();
       if (erro.jaColetado) onJaColetado(ponto.id);
       setPodeTentarDeNovo(!erro.jaColetado);
       setMensagemErro(erro.message);
@@ -265,20 +271,27 @@ export function ARColetaScreen({
       )}
 
       {/* Topo: nome do ponto e botão de fechar */}
-      <View style={styles.topo}>
+      <View style={[styles.topo, { paddingTop: insets.top + 28 }]}>
         <View style={styles.topoTextos}>
           <Text style={styles.topoRotulo}>Coleta em AR</Text>
           <Text style={styles.topoTitulo} numberOfLines={1}>
             {ponto.nome}
           </Text>
         </View>
-        <TouchableOpacity style={styles.fechar} onPress={onFechar} activeOpacity={0.8}>
-          <Text style={styles.fecharTexto}>✕</Text>
+        <TouchableOpacity
+          style={styles.fechar}
+          onPress={onFechar}
+          activeOpacity={0.8}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Fechar câmera e voltar ao mapa"
+        >
+          <Ionicons name="close" size={22} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
       {/* Instrução / estado */}
-      <View style={styles.rodape}>
+      <View style={[styles.rodape, { bottom: insets.bottom + 24 }]}>
         <Rodape
           fase={fase}
           rastreando={rastreando}
@@ -330,8 +343,8 @@ function Rodape(props: {
         <View style={styles.cartao}>
           <Text style={styles.cartaoTitulo}>AR indisponível neste aparelho</Text>
           <Text style={styles.cartaoTexto}>
-            Este celular não é compatível com o ARCore, ou o app "Google Play Services para
-            RA" não está instalado.
+            Este celular não é compatível com o ARCore, ou o app “Google Play Services para
+            RA” não está instalado.
           </Text>
           <Botao texto="Voltar ao mapa" onPress={props.onFechar} />
         </View>
@@ -403,6 +416,7 @@ function Botao({ texto, onPress, secundario }: { texto: string; onPress: () => v
       style={[styles.botao, secundario && styles.botaoSecundario]}
       onPress={onPress}
       activeOpacity={0.8}
+      accessibilityRole="button"
     >
       <Text style={[styles.botaoTexto, secundario && styles.botaoTextoSecundario]}>{texto}</Text>
     </TouchableOpacity>
@@ -422,7 +436,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 52,
     paddingBottom: 14,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
@@ -450,16 +463,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fecharTexto: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
   rodape: {
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 32,
   },
   cartao: {
     backgroundColor: 'rgba(255, 255, 255, 0.96)',

@@ -11,6 +11,7 @@ import { AppState } from 'react-native';
 import { Desafio } from '../types';
 import * as desafiosService from '../services/desafios';
 import { buscarPontuacao } from '../services/interacoes';
+import { vibrarSucesso, vibrarErro } from '../utils/vibracao';
 import { useAuth } from './AuthContext';
 
 /** Partida rolando ou esperando o oponente: o placar muda a qualquer momento. */
@@ -84,8 +85,9 @@ export function DesafioProvider({ children }: { children: React.ReactNode }) {
 
   const ativo = desafio?.status === 'EM_ANDAMENTO' || desafio?.status === 'AGUARDANDO';
 
+  const usuarioId = usuario?.id;
   useEffect(() => {
-    if (!usuario) {
+    if (!usuarioId) {
       setDesafio(null);
       return;
     }
@@ -94,14 +96,18 @@ export function DesafioProvider({ children }: { children: React.ReactNode }) {
     atualizar();
     const timer = setInterval(atualizar, ativo ? INTERVALO_ATIVO_MS : INTERVALO_OCIOSO_MS);
     return () => clearInterval(timer);
-  }, [usuario?.id, emPrimeiroPlano, ativo, atualizar]);
+  }, [usuarioId, emPrimeiroPlano, ativo, atualizar]);
 
   // Ao terminar (vitória por tempo, desistência do oponente), o bônus muda a pontuação:
   // busca o valor novo para Início e Perfil ficarem certos.
+  // Também vibra nos momentos-chave: o oponente entrou (a partida começou) e o resultado.
   const statusAnterior = useRef(desafio?.status);
   useEffect(() => {
+    const comecou = statusAnterior.current === 'AGUARDANDO' && desafio?.status === 'EM_ANDAMENTO';
     const terminou = statusAnterior.current === 'EM_ANDAMENTO' && desafio?.status === 'FINALIZADO';
     statusAnterior.current = desafio?.status;
+    if (comecou || (terminou && desafio?.resultado === 'vitoria')) vibrarSucesso();
+    if (terminou && desafio?.resultado === 'derrota') vibrarErro();
     if (terminou && desafio?.resultado === 'vitoria') {
       buscarPontuacao()
         .then((total) => total !== pontuacaoRef.current && atualizarPontuacao(total))

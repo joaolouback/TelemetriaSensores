@@ -4,6 +4,7 @@ import { API_URL } from '../constants';
 import { SensorLog } from '../types';
 import { wsService } from './websocket';
 import { getToken, getUsuarioId } from './auth';
+import { logDebug } from '../utils/log';
 
 /**
  * Registros por envio. Depois de horas offline o acumulado passa de milhares;
@@ -41,14 +42,14 @@ async function sincronizar(): Promise<number> {
       const lote = await getUnsyncedLogs(getUsuarioId(), LOTE_SYNC);
       if (lote.length === 0) break;
 
-      console.log(`[Sync] Enviando lote de ${lote.length} logs. WS conectado: ${wsService.isConnected}`);
+      logDebug(`[Sync] Enviando lote de ${lote.length} logs. WS conectado: ${wsService.isConnected}`);
       total += await enviarLote(lote);
 
       if (lote.length < LOTE_SYNC) break;
     }
 
     if (total === 0) {
-      console.log('[Sync] Nenhum log pendente para sincronizar.');
+      logDebug('[Sync] Nenhum log pendente para sincronizar.');
     }
   } catch (error) {
     console.error(`[Sync] Falha na sincronização (${total} enviados antes do erro):`, error);
@@ -56,7 +57,7 @@ async function sincronizar(): Promise<number> {
 
   try {
     const apagados = await limparLogsSincronizados(DIAS_RETENCAO_LOCAL);
-    if (apagados > 0) console.log(`[Sync] ${apagados} logs antigos já sincronizados removidos do aparelho.`);
+    if (apagados > 0) logDebug(`[Sync] ${apagados} logs antigos já sincronizados removidos do aparelho.`);
   } catch (error) {
     console.warn('[Sync] Falha ao limpar logs antigos:', error);
   }
@@ -100,6 +101,6 @@ async function enviarLote(lote: SensorLog[]): Promise<number> {
   const syncedIds = lote.map((log) => log.id).filter((id): id is number => id !== undefined);
   await markLogsAsSynced(syncedIds);
 
-  console.log(`[Sync] Lote OK: ${syncedIds.length} logs sincronizados.`);
+  logDebug(`[Sync] Lote OK: ${syncedIds.length} logs sincronizados.`);
   return syncedIds.length;
 }

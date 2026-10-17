@@ -8,6 +8,8 @@ import { RegistroScreen } from './src/screens/RegistroScreen';
 import { ConsentimentoScreen } from './src/screens/ConsentimentoScreen';
 import { DesafioProvider } from './src/contexts/DesafioContext';
 import { HOME_COLORS } from './src/constants';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ErroBoundary } from './src/components/ErroBoundary';
 
 /**
  * Mostra o consentimento (na primeira abertura), as telas de login/registro
@@ -50,10 +52,14 @@ export default function App() {
   // TelemetriaProvider fica acima da checagem de login: com consentimento,
   // a coleta começa assim que o app abre, mesmo antes de o usuário entrar.
   return (
-    <AuthProvider>
-      <TelemetriaProvider>
-        <Conteudo />
-      </TelemetriaProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <ErroBoundary>
+        <AuthProvider>
+          <TelemetriaProvider>
+            <Conteudo />
+          </TelemetriaProvider>
+        </AuthProvider>
+      </ErroBoundary>
+    </SafeAreaProvider>
   );
 }

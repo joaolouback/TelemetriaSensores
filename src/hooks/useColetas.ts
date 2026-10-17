@@ -23,13 +23,16 @@ export function useColetas() {
 
   // A pontuação muda a cada check-in: recarregar com ela mantém em dia todas as
   // telas que usam o hook (Mapa e Início ficam montadas ao mesmo tempo).
+  const usuarioId = usuario?.id;
+  const pontuacao = usuario?.pontuacaoTotal;
   useEffect(() => {
-    if (usuario) {
+    if (usuarioId) {
       carregar();
     } else {
       setColetados(new Set());
     }
-  }, [usuario?.id, usuario?.pontuacaoTotal, carregar]);
+    // `pontuacao` não é lida aqui: é o gatilho que dispara a recarga após um check-in.
+  }, [usuarioId, pontuacao, carregar]);
 
   const marcarColetado = useCallback((pontoId: number) => {
     setColetados((anterior) => new Set(anterior).add(pontoId));
