@@ -5,7 +5,7 @@
  * Mostra a posição do usuário em tempo real, os pontos de coleta da API,
  * o raio de geofence de cada ponto e o trajeto percorrido.
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ARColetaScreen } from './ARColetaScreen';
 import { CAMPUS_UVV, MAP_DEFAULT_DELTA, HOME_COLORS } from '../constants';
 import { formatDistancia, formatNumber } from '../utils';
-import { PontoComDistancia, ResultadoCheckin } from '../types';
+import { LocationData, PontoComDistancia, ResultadoCheckin } from '../types';
 import { MAP_LIGHT_STYLE } from '../constants/mapStyle';
 
 const REGIAO_INICIAL: Region = {
@@ -35,7 +35,28 @@ const REGIAO_INICIAL: Region = {
 };
 
 export function MapScreen() {
-  const { localizacao, trajeto, permissao, erro: erroLocal, limparTrajeto } = useLiveLocation(true);
+  const {
+    localizacao: localizacaoReal,
+    trajeto,
+    permissao,
+    erro: erroLocal,
+    limparTrajeto,
+  } = useLiveLocation(true);
+
+  /**
+   * Modo simulação (só em desenvolvimento): segurar um ponto da lista "teleporta"
+   * o jogador para ele. Substitui o GPS no mapa, no geofence e no check-in, para
+   * testar a coleta em AR longe do campus. Some no build de produção (`__DEV__`).
+   */
+  const [simulacao, setSimulacao] = useState<{ nome: string; latitude: number; longitude: number } | null>(null);
+  const localizacao = useMemo<LocationData | null>(
+    () =>
+      simulacao
+        ? { latitude: simulacao.latitude, longitude: simulacao.longitude, accuracy: 0, timestamp: Date.now() }
+        : localizacaoReal,
+    [simulacao, localizacaoReal]
+  );
+
   const {
     pontosComDistancia,
     pontoMaisProximo,
@@ -172,6 +193,14 @@ export function MapScreen() {
           </React.Fragment>
         ))}
 
+        {simulacao && (
+          <Marker
+            coordinate={{ latitude: simulacao.latitude, longitude: simulacao.longitude }}
+            title="Você (simulado)"
+            pinColor={HOME_COLORS.discoverPurple}
+          />
+        )}
+
         {trajeto.length > 1 && (
           <Polyline
             coordinates={trajeto}
@@ -185,14 +214,26 @@ export function MapScreen() {
       <View style={styles.header}>
         <View style={styles.headerTextos}>
           <Text style={styles.headerTitulo}>Mapa do Campus</Text>
-          <Text style={styles.headerSubtitulo}>
-            {localizacao
-              ? `${formatNumber(localizacao.latitude, 5)}, ${formatNumber(localizacao.longitude, 5)}` +
-                (localizacao.accuracy ? `  ±${Math.round(localizacao.accuracy)}m` : '')
-              : 'Obtendo sinal de GPS...'}
+          <Text style={[styles.headerSubtitulo, simulacao && styles.headerSimulacao]}>
+            {simulacao
+              ? `🧪 Simulando posição em ${simulacao.nome}`
+              : localizacao
+                ? `${formatNumber(localizacao.latitude, 5)}, ${formatNumber(localizacao.longitude, 5)}` +
+                  (localizacao.accuracy ? `  ±${Math.round(localizacao.accuracy)}m` : '')
+                : 'Obtendo sinal de GPS...'}
           </Text>
         </View>
-        {carregando && <ActivityIndicator color={HOME_COLORS.discoverBlue} />}
+        {simulacao ? (
+          <TouchableOpacity
+            style={styles.botaoSairSimulacao}
+            onPress={() => setSimulacao(null)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.botaoSairSimulacaoTexto}>Usar GPS</Text>
+          </TouchableOpacity>
+        ) : (
+          carregando && <ActivityIndicator color={HOME_COLORS.discoverBlue} />
+        )}
       </View>
 
       {/* Aviso de geofence ativo */}
@@ -311,6 +352,14 @@ export function MapScreen() {
                   600
                 );
               }}
+              onLongPress={
+                __DEV__
+                  ? () => {
+                      setSimulacao({ nome: ponto.nome, latitude: ponto.latitude, longitude: ponto.longitude });
+                      setSeguindoUsuario(true);
+                    }
+                  : undefined
+              }
             >
               <Text style={styles.chipNome} numberOfLines={1}>
                 {ponto.nome}
@@ -385,6 +434,21 @@ const styles = StyleSheet.create({
     color: HOME_COLORS.textSecondary,
     marginTop: 3,
     fontVariant: ['tabular-nums'],
+  },
+  headerSimulacao: {
+    color: HOME_COLORS.discoverPurple,
+    fontWeight: '700',
+  },
+  botaoSairSimulacao: {
+    backgroundColor: HOME_COLORS.discoverPurple,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  botaoSairSimulacaoTexto: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
   },
   alertaGeofence: {
     position: 'absolute',
