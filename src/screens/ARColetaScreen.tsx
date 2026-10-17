@@ -211,7 +211,7 @@ export function ARColetaScreen({ ponto, localizacao, onFechar, onColetado, onJaC
     setMensagemErro(null);
 
     try {
-      const res = await registrarCheckin(ponto.id, posicao.latitude, posicao.longitude);
+      const res = await registrarCheckin(ponto.id, posicao);
       setResultado(res);
       setFase('coletado');
       onColetado(ponto.id, res);

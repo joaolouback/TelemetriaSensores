@@ -10,10 +10,14 @@ import {
   StatusBar,
   TouchableOpacity,
   Alert,
+  Switch,
 } from 'react-native';
-import { HOME_COLORS, USER_MOCK } from '../constants';
+import { HOME_COLORS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { useTelemetria } from '../contexts/TelemetriaContext';
 import { obterIniciais } from '../utils';
+import { calcularNivel } from '../utils/nivel';
+import { useColetas } from '../hooks/useColetas';
 
 const CONQUISTAS_MOCK = [
   { id: 1, titulo: 'Primeiro Passo', desc: 'Fez check-in no mapa', icone: '📍' },
@@ -24,11 +28,29 @@ const CONQUISTAS_MOCK = [
 
 export function ProfileScreen() {
   const { usuario, sair } = useAuth();
-  // Nível/XP/conquistas ainda são mock; nome, e-mail e iniciais vêm do usuário logado.
+  const { consentimento, definirConsentimento } = useTelemetria();
+  const { coletados } = useColetas();
+  // Pontuação, nível e locais são reais; a lista de conquistas ainda é mock.
+  const pontuacao = usuario?.pontuacaoTotal ?? 0;
+  const nivel = calcularNivel(pontuacao);
   const user = {
-    ...USER_MOCK,
-    nome: usuario?.nome ?? USER_MOCK.nome,
-    iniciais: usuario ? obterIniciais(usuario.nome) : USER_MOCK.iniciais,
+    nome: usuario?.nome ?? '',
+    iniciais: usuario ? obterIniciais(usuario.nome) : '',
+  };
+
+  const alternarTelemetria = (ligar: boolean) => {
+    if (ligar) {
+      definirConsentimento(true).catch(console.error);
+      return;
+    }
+    Alert.alert(
+      'Parar de compartilhar?',
+      'A coleta será desligada e os registros que ainda não foram enviados serão apagados do aparelho.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Desligar', style: 'destructive', onPress: () => definirConsentimento(false).catch(console.error) },
+      ]
+    );
   };
 
   const confirmarSaida = () => {
@@ -53,19 +75,19 @@ export function ProfileScreen() {
             <Text style={styles.avatarTexto}>{user.iniciais}</Text>
           </View>
           <Text style={styles.nome}>{user.nome}</Text>
-          <Text style={styles.titulo}>{user.titulo} · Nível {user.nivel}</Text>
+          <Text style={styles.titulo}>{nivel.titulo} · Nível {nivel.nivel}</Text>
           <Text style={styles.email}>{usuario?.email}</Text>
         </View>
 
         {/* ESTATÍSTICAS */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Text style={styles.statValor}>{user.xpAtual.toLocaleString('pt-BR')}</Text>
-            <Text style={styles.statLabel}>Total XP</Text>
+            <Text style={styles.statValor}>{pontuacao.toLocaleString('pt-BR')}</Text>
+            <Text style={styles.statLabel}>Pontos</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statValor}>12</Text>
+            <Text style={styles.statValor}>{coletados.size}</Text>
             <Text style={styles.statLabel}>Locais Visitados</Text>
           </View>
           <View style={styles.statDivider} />
@@ -90,6 +112,20 @@ export function ProfileScreen() {
 
         {/* OPÇÕES */}
         <View style={styles.opcoesContainer}>
+          <View style={[styles.opcaoItem, styles.opcaoLinha]}>
+            <View style={styles.opcaoTextos}>
+              <Text style={styles.opcaoTexto}>🔒 Compartilhar telemetria</Text>
+              <Text style={styles.opcaoDescricao}>
+                GPS, movimento e bateria para a pesquisa do TCC
+              </Text>
+            </View>
+            <Switch
+              value={consentimento === true}
+              onValueChange={alternarTelemetria}
+              trackColor={{ true: HOME_COLORS.discoverBlue, false: HOME_COLORS.cardBorder }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
           <TouchableOpacity style={styles.opcaoItem} activeOpacity={0.7}>
             <Text style={styles.opcaoTexto}>⚙️ Configurações da Conta</Text>
           </TouchableOpacity>
@@ -241,5 +277,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: HOME_COLORS.textPrimary,
+  },
+  opcaoLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  opcaoTextos: {
+    flex: 1,
+    marginRight: 12,
+  },
+  opcaoDescricao: {
+    fontSize: 12,
+    color: HOME_COLORS.textSecondary,
+    marginTop: 2,
   },
 });

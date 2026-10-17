@@ -31,7 +31,7 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }: AuthLayoutProps) {
-  const { status } = useTelemetria();
+  const { status, consentimento } = useTelemetria();
   const coletando = status === CollectionStatus.COLLECTING;
 
   return (
@@ -93,7 +93,9 @@ export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }:
           <Text style={styles.coletaTexto}>
             {coletando
               ? 'Coleta de sensores ativa · dados salvos no aparelho'
-              : 'Preparando coleta de sensores...'}
+              : consentimento === false
+                ? 'Coleta de sensores desligada · ative no Perfil quando quiser'
+                : 'Preparando coleta de sensores...'}
           </Text>
         </View>
       </ScrollView>

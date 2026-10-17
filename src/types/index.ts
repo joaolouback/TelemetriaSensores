@@ -5,6 +5,8 @@ export interface LocationData {
   longitude: number;
   accuracy: number | null;
   timestamp: number;
+  /** Android: `true` quando a posição vem de um app de GPS falso. */
+  mocked?: boolean;
 }
 
 export interface AccelerometerData {

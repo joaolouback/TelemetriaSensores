@@ -163,19 +163,40 @@ export async function deleteAllLogs(): Promise<void> {
  * os dele e os coletados sem ninguém logado. Logs de outro usuário que
  * saiu da conta ficam aguardando o próximo login dele.
  */
-export async function getUnsyncedLogs(usuarioId: number | null): Promise<SensorLog[]> {
+export async function getUnsyncedLogs(usuarioId: number | null, limite: number): Promise<SensorLog[]> {
   const database = getDatabase();
   if (usuarioId === null) {
     return await database.getAllAsync<SensorLog>(
-      `SELECT * FROM ${TABLE_NAME} WHERE synced = 0 AND usuario_id IS NULL ORDER BY id ASC`
+      `SELECT * FROM ${TABLE_NAME} WHERE synced = 0 AND usuario_id IS NULL ORDER BY id ASC LIMIT ?`,
+      [limite]
     );
   }
   return await database.getAllAsync<SensorLog>(
     `SELECT * FROM ${TABLE_NAME}
      WHERE synced = 0 AND (usuario_id IS NULL OR usuario_id = ?)
-     ORDER BY id ASC`,
-    [usuarioId]
+     ORDER BY id ASC LIMIT ?`,
+    [usuarioId, limite]
   );
+}
+
+/**
+ * Apaga os registros já sincronizados mais antigos que `dias`. O servidor já tem
+ * uma cópia; sem isso o SQLite cresce ~2.900 linhas por dia de coleta.
+ */
+export async function limparLogsSincronizados(dias: number): Promise<number> {
+  const database = getDatabase();
+  const limite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+  const resultado = await database.runAsync(
+    `DELETE FROM ${TABLE_NAME} WHERE synced = 1 AND timestamp < ?`,
+    [limite]
+  );
+  return resultado.changes;
+}
+
+/** Apaga o que ainda não foi enviado — usado quando o usuário revoga o consentimento. */
+export async function deleteUnsyncedLogs(): Promise<void> {
+  const database = getDatabase();
+  await database.runAsync(`DELETE FROM ${TABLE_NAME} WHERE synced = 0`);
 }
 
 
@@ -230,4 +251,28 @@ export async function salvarSessao(sessao: Sessao): Promise<void> {
 export async function limparSessao(): Promise<void> {
   const database = await initDatabase();
   await database.runAsync(`DELETE FROM ${SESSION_TABLE_NAME} WHERE chave = ?`, [CHAVE_SESSAO]);
+}
+
+
+// ─── Consentimento da telemetria (LGPD) ──────────────────────────────
+// Fica no aparelho, e não na conta: a coleta pode começar antes do login.
+
+const CHAVE_CONSENTIMENTO = 'consentimento_telemetria';
+
+/** `true`/`false` se o usuário já decidiu; `null` se ainda não respondeu. */
+export async function getConsentimentoTelemetria(): Promise<boolean | null> {
+  const database = await initDatabase();
+  const row = await database.getFirstAsync<{ valor: string }>(
+    `SELECT valor FROM ${SESSION_TABLE_NAME} WHERE chave = ?`,
+    [CHAVE_CONSENTIMENTO]
+  );
+  return row ? row.valor === 'sim' : null;
+}
+
+export async function salvarConsentimentoTelemetria(aceito: boolean): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO ${SESSION_TABLE_NAME} (chave, valor) VALUES (?, ?)`,
+    [CHAVE_CONSENTIMENTO, aceito ? 'sim' : 'nao']
+  );
 }

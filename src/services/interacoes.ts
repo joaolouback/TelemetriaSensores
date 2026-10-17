@@ -5,7 +5,7 @@
  * revalida o geofence com a posição enviada e credita os pontos uma única vez.
  */
 import { API_URL } from '../constants';
-import { ResultadoCheckin } from '../types';
+import { LocationData, ResultadoCheckin } from '../types';
 import { getToken } from './auth';
 
 /** Erro com mensagem já pronta para exibir ao usuário. */
@@ -25,17 +25,23 @@ function cabecalhos(): Record<string, string> {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
-export async function registrarCheckin(
-  pontoId: number,
-  latitude: number,
-  longitude: number
-): Promise<ResultadoCheckin> {
+/**
+ * Envia o check-in com a posição atual. A precisão e o aviso de GPS falso
+ * (`mocked`, só no Android) vão junto para o backend recusar posições não confiáveis.
+ */
+export async function registrarCheckin(pontoId: number, posicao: LocationData): Promise<ResultadoCheckin> {
   let resposta: Response;
   try {
     resposta = await fetch(`${API_URL}/interacoes`, {
       method: 'POST',
       headers: cabecalhos(),
-      body: JSON.stringify({ pontoId, latitude, longitude }),
+      body: JSON.stringify({
+        pontoId,
+        latitude: posicao.latitude,
+        longitude: posicao.longitude,
+        precisao: posicao.accuracy,
+        mockado: posicao.mocked ?? null,
+      }),
     });
   } catch {
     throw new CheckinError('Sem conexão com o servidor. Verifique sua internet e toque de novo.');

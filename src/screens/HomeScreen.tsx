@@ -2,9 +2,10 @@
  * Tela Inicial gamificada — UVV Go
  *
  * Layout inspirado em apps gamificados, com saudação, card de nível/XP,
- * missões diárias e seção "Descubra" com locais do campus.
+ * próximas coletas e seção "Descubra" com os pontos do campus — tudo com
+ * os dados reais da API (pontuação, pontos e o que já foi coletado).
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,17 +15,17 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import {
-  HOME_COLORS,
-  USER_MOCK,
-  MISSOES_MOCK,
-  DESCUBRA_MOCK,
-} from '../constants';
+import { HOME_COLORS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { usePontos } from '../hooks/usePontos';
+import { useColetas } from '../hooks/useColetas';
 import { obterIniciais } from '../utils';
+import { calcularNivel } from '../utils/nivel';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DISCOVER_CARD_WIDTH = (SCREEN_WIDTH - 48 - 12) / 2; // padding + gap
+const CORES_DESCUBRA = ['#3B5BDB', '#7C3AED', '#059669', '#D97706'];
+const MAX_PROXIMAS_COLETAS = 3;
 
 function getSaudacao(): string {
   const hora = new Date().getHours();
@@ -35,15 +36,25 @@ function getSaudacao(): string {
 
 export function HomeScreen() {
   const { usuario } = useAuth();
-  // Nível/XP ainda são mock; nome e iniciais vêm do usuário logado.
-  const primeiroNome = usuario?.nome.trim().split(/\s+/)[0] ?? USER_MOCK.nome;
+  const { pontos } = usePontos(null);
+  const { coletados } = useColetas();
+
+  const pontuacao = usuario?.pontuacaoTotal ?? 0;
+  const nivel = calcularNivel(pontuacao);
   const user = {
-    ...USER_MOCK,
-    nome: primeiroNome,
-    iniciais: usuario ? obterIniciais(usuario.nome) : USER_MOCK.iniciais,
+    nome: usuario?.nome.trim().split(/\s+/)[0] ?? '',
+    iniciais: usuario ? obterIniciais(usuario.nome) : '',
   };
-  const xpProgresso = user.xpAtual / user.xpProximoNivel;
-  const xpFaltando = user.xpProximoNivel - user.xpAtual;
+
+  // Pendentes primeiro (os que ainda dão pontos), depois os já coletados.
+  const pontosOrdenados = useMemo(
+    () =>
+      [...pontos].sort(
+        (a, b) => Number(coletados.has(a.id)) - Number(coletados.has(b.id)) || a.id - b.id
+      ),
+    [pontos, coletados]
+  );
+  const proximasColetas = pontosOrdenados.slice(0, MAX_PROXIMAS_COLETAS);
 
   return (
     <View style={styles.container}>
@@ -70,64 +81,66 @@ export function HomeScreen() {
           <View style={styles.xpCardInner}>
             <View style={styles.xpHeader}>
               <View>
-                <Text style={styles.xpNivelLabel}>Nível {user.nivel}</Text>
-                <Text style={styles.xpTitulo}>{user.titulo}</Text>
+                <Text style={styles.xpNivelLabel}>Nível {nivel.nivel}</Text>
+                <Text style={styles.xpTitulo}>{nivel.titulo}</Text>
               </View>
               <View style={styles.xpValor}>
                 <Text style={styles.xpNumero}>
-                  {user.xpAtual.toLocaleString('pt-BR')}
+                  {pontuacao.toLocaleString('pt-BR')}
                 </Text>
-                <Text style={styles.xpSufixo}> XP</Text>
+                <Text style={styles.xpSufixo}> pts</Text>
               </View>
             </View>
 
             {/* Barra de progresso */}
             <View style={styles.xpBarContainer}>
               <View style={styles.xpBarBg}>
-                <View style={[styles.xpBarFill, { width: `${xpProgresso * 100}%` }]} />
+                <View style={[styles.xpBarFill, { width: `${nivel.progresso * 100}%` }]} />
               </View>
               <Text style={styles.xpFaltando}>
-                Faltam {xpFaltando.toLocaleString('pt-BR')} XP para o Nível {user.nivel + 1}
+                Faltam {nivel.faltam} pontos para o Nível {nivel.nivel + 1}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* ─── Missões Diárias ─── */}
+        {/* ─── Próximas coletas ─── */}
         <View style={styles.secaoHeader}>
-          <Text style={styles.secaoTitulo}>Missões Diárias</Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={styles.secaoLink}>Ver todas</Text>
-          </TouchableOpacity>
+          <Text style={styles.secaoTitulo}>Próximas coletas</Text>
+          {pontos.length > 0 && (
+            <Text style={styles.secaoLink}>
+              {coletados.size}/{pontos.length} coletados
+            </Text>
+          )}
         </View>
 
         <View style={styles.missoesContainer}>
-          {MISSOES_MOCK.map((missao) => (
-            <View key={missao.id} style={styles.missaoCard}>
-              <View style={[
-                styles.missaoIcone,
-                missao.concluida && styles.missaoIconeConcluida,
-              ]}>
-                <Text style={styles.missaoIconeTexto}>{missao.icone}</Text>
+          {proximasColetas.map((ponto) => {
+            const concluida = coletados.has(ponto.id);
+            return (
+              <View key={ponto.id} style={styles.missaoCard}>
+                <View style={[styles.missaoIcone, concluida && styles.missaoIconeConcluida]}>
+                  <Text style={styles.missaoIconeTexto}>{concluida ? '✅' : '💎'}</Text>
+                </View>
+                <View style={styles.missaoTextos}>
+                  <Text style={[styles.missaoTitulo, concluida && styles.missaoTituloConcluida]}>
+                    Colete o cristal: {ponto.nome}
+                  </Text>
+                  <Text style={styles.missaoDescricao} numberOfLines={1}>
+                    {ponto.descricao ?? 'Vá até o ponto e abra a câmera AR no mapa.'}
+                  </Text>
+                </View>
+                {concluida ? (
+                  <Text style={styles.missaoFeito}>Feito</Text>
+                ) : (
+                  <Text style={styles.missaoXp}>+{ponto.pontosRecompensa} pts</Text>
+                )}
               </View>
-              <View style={styles.missaoTextos}>
-                <Text
-                  style={[
-                    styles.missaoTitulo,
-                    missao.concluida && styles.missaoTituloConcluida,
-                  ]}
-                >
-                  {missao.titulo}
-                </Text>
-                <Text style={styles.missaoDescricao}>{missao.descricao}</Text>
-              </View>
-              {missao.concluida ? (
-                <Text style={styles.missaoFeito}>Feito</Text>
-              ) : (
-                <Text style={styles.missaoXp}>+{missao.xp} XP</Text>
-              )}
-            </View>
-          ))}
+            );
+          })}
+          {pontos.length === 0 && (
+            <Text style={styles.missaoDescricao}>Carregando os pontos do campus...</Text>
+          )}
         </View>
 
         {/* ─── Descubra ─── */}
@@ -136,16 +149,18 @@ export function HomeScreen() {
         </Text>
 
         <View style={styles.descubraGrid}>
-          {DESCUBRA_MOCK.map((local) => (
+          {pontosOrdenados.slice(MAX_PROXIMAS_COLETAS, MAX_PROXIMAS_COLETAS + 4).map((ponto, i) => (
             <TouchableOpacity
-              key={local.id}
-              style={[styles.descubraCard, { backgroundColor: local.cor }]}
+              key={ponto.id}
+              style={[styles.descubraCard, { backgroundColor: CORES_DESCUBRA[i % CORES_DESCUBRA.length] }]}
               activeOpacity={0.85}
             >
-              <Text style={styles.descubraNome}>{local.nome}</Text>
+              <Text style={styles.descubraNome}>{ponto.nome}</Text>
               <View style={styles.descubraBottom}>
-                <Text style={styles.descubraLabel}>{local.nome}</Text>
-                <Text style={styles.descubraDistancia}>📍 {local.distancia}</Text>
+                <Text style={styles.descubraLabel}>
+                  {coletados.has(ponto.id) ? '✓ Coletado' : 'Cristal disponível'}
+                </Text>
+                <Text style={styles.descubraDistancia}>⭐ {ponto.pontosRecompensa} pts</Text>
               </View>
             </TouchableOpacity>
           ))}

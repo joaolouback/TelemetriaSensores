@@ -29,11 +29,29 @@ export function DashboardScreen() {
     clearDatabase,
     status,
     saveCount,
-    iniciar: handleStart,
+    iniciar,
     parar: handleStop,
+    consentimento,
+    definirConsentimento,
   } = useTelemetria();
 
   const isCollecting = status === CollectionStatus.COLLECTING;
+
+  // Sem consentimento, iniciar a coleta pede o aceite antes (LGPD).
+  const handleStart = useCallback(async () => {
+    if (consentimento === true) {
+      await iniciar();
+      return;
+    }
+    Alert.alert(
+      'Compartilhar telemetria?',
+      'A coleta grava sua localização, movimento e bateria para a pesquisa do TCC. Você pode desligar depois no Perfil.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Aceitar e iniciar', onPress: () => definirConsentimento(true).catch(console.error) },
+      ]
+    );
+  }, [consentimento, iniciar, definirConsentimento]);
 
   const handleClear = useCallback(() => {
     Alert.alert(
@@ -191,7 +209,7 @@ export function DashboardScreen() {
 
 
         <Text style={styles.footer}>
-          SensorTelemetryApp v1.0
+          UVV Go · telemetria v1.0
         </Text>
 
         <Text style={styles.footer}>

@@ -18,6 +18,8 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Detecção de proximidade**: o círculo fica verde e um aviso aparece ao entrar no raio de um ponto.
 - **Trajeto percorrido**: o caminho é desenhado em tempo real (Polyline).
 - **Ponto mais próximo**: distância ao vivo, calculada no aparelho — funciona sem rede.
+- **Modo simulação (só em desenvolvimento)**: segurar um ponto da lista coloca o jogador nele,
+  substituindo o GPS no mapa, no geofence e no check-in — para testar a coleta longe do campus.
 
 ### Coleta em Realidade Aumentada (ARCore)
 - **Câmera liberada no raio**: dentro do geofence de um ponto aparece o botão *Abrir câmera AR*.
@@ -28,14 +30,19 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
   O backend revalida o geofence, credita os pontos uma única vez e devolve as conquistas
   desbloqueadas.
 - **Pontos coletados**: o marcador fica dourado e a câmera não é mais oferecida naquele ponto.
+  A tela *Início* mostra o nível (30 pontos por nível) e as próximas coletas com os pontos reais.
+- **Anti-trapaça**: o check-in envia a precisão do GPS e o aviso de localização simulada do
+  Android (`location.mocked`); o backend recusa GPS falso e leituras piores que ±50 m.
 
 ### Conta de usuário
 - **Login e registro** (e-mail e senha) validados pelo backend (`/api/auth/*`).
 - A sessão fica salva no SQLite: o app abre já logado, mesmo sem internet.
 
 ### Telemetria
-- **Início automático**: a coleta começa assim que o app abre (inclusive na tela de
-  login) e funciona offline. A aba *Sensores* permite pausar/retomar.
+- **Consentimento (LGPD)**: na primeira abertura, a tela *Sua privacidade* explica o que é
+  coletado e para quê. Só com o aceite a coleta começa — automaticamente, inclusive na tela
+  de login, e offline. Recusar não muda o jogo. O interruptor no *Perfil* desliga a coleta e
+  apaga do aparelho o que ainda não foi enviado. A aba *Sensores* permite pausar/retomar.
 - **Tabela `telemetria_sensor`**: mesmas colunas da classe `TelemetriaSensor` do
   diagrama (`latitude`, `longitude`, `acelerometro_x/y/z`, `magnitude`,
   `nivel_bateria`, `tipo_rede`, `timestamp`) + `usuario_id` e `synced`. Leituras sem
@@ -46,8 +53,10 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Conectividade**: estado da rede (Wi-Fi, dados móveis ou offline).
 - **Armazenamento offline**: persistência local em SQLite (`expo-sqlite`), gravando em
   lotes a cada 30 segundos para preservar bateria.
-- **Sincronização**: envio ao backend via WebSocket, com fallback para HTTP REST.
-  Com usuário logado, o token vai junto e os registros ficam associados a ele.
+- **Sincronização**: envio ao backend via WebSocket, com fallback para HTTP REST, em lotes
+  de até 200 registros (horas offline não travam o envio). Com usuário logado, o token vai
+  junto e os registros ficam associados a ele. Registros já enviados são apagados do
+  aparelho após 7 dias.
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -88,14 +97,16 @@ src/
    npm install
    ```
 
-2. **Na primeira vez**, com o celular conectado por USB (depuração USB ativada), compile e
-   instale o app — exige o Android Studio instalado:
+2. **Na primeira vez**, compile o app na nuvem da Expo (EAS Build, conta gratuita) e
+   instale o APK no celular pelo QR code que aparece no fim — passo a passo no
+   `SETUP.md` da API (seção 3.3):
    ```bash
-   npm run android
+   npm run build:android
    ```
    > O app usa ARCore (código nativo), por isso **não roda no Expo Go**: é um
-   > *development build* (`expo-dev-client`). Só é preciso recompilar ao mudar uma
-   > dependência nativa ou o `app.json`.
+   > *development build* (`expo-dev-client`), configurado em `eas.json`. Só é preciso
+   > recompilar ao mudar uma dependência nativa, o `app.json`/`app.config.js` ou a chave
+   > do Maps. Com o Android Studio instalado, `npm run android` faz o mesmo localmente.
 
 3. No dia a dia, inicie o Metro e abra o app **UVV Go** no celular:
    ```bash
@@ -123,9 +134,10 @@ EXPO_PUBLIC_API_PORT=3000
 ## 🗺️ Sobre o mapa
 
 O mapa usa o Google Maps através do `react-native-maps`. Como o app não roda mais no
-Expo Go, é **obrigatório** ter uma chave do Google Maps (Maps SDK for Android) em
-`app.json` (`android.config.googleMaps.apiKey`) — sem ela o mapa abre cinza. Hoje há um
-placeholder ali; veja o passo 3.2 do `SETUP.md`.
+Expo Go, é **obrigatório** ter uma chave do Google Maps (Maps SDK for Android) — sem ela
+o mapa abre cinza. A chave **não fica no repositório**: o `app.config.js` lê a variável
+`GOOGLE_MAPS_API_KEY`, cadastrada na Expo (`eas env:create`) para o build na nuvem ou no
+`.env` para o build local. Veja os passos 3.2 e 3.3 do `SETUP.md`.
 
 As coordenadas dos 10 pontos ainda são **aproximadas**, definidas no seed do backend
 (`prisma/seed.ts`), à espera da coleta em campo. Testando fora do campus, os pontos
