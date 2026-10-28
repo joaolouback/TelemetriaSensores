@@ -1,36 +1,33 @@
 {
   "expo": {
     "name": "UVV Go",
-    "slug": "SensorTelemetryApp",
+    "slug": "uvv-go",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F0F1A"
+      "backgroundColor": "#1B2B5E"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F0F1A",
+        "backgroundColor": "#1B2B5E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": "COLOQUE_SUA_CHAVE_DO_GOOGLE_MAPS_AQUI"
-        }
-      }
+      "package": "br.uvv.uvvgo"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,9 +37,21 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Permitir que o SensorTelemetryApp acesse sua localização para coleta de telemetria."
+          "locationWhenInUsePermission": "O UVV Go usa sua localização para mostrar sua posição no mapa do campus e liberar a coleta dos cristais nos pontos."
+        }
+      ],
+      "expo-dev-client",
+      [
+        "@reactvision/react-viro",
+        {
+          "android": {
+            "xRMode": [
+              "AR"
+            ]
+          }
         }
       ]
-    ]
+    ],
+    "newArchEnabled": true
   }
 }

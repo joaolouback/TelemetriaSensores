@@ -1,6 +1,7 @@
 /** Serviço WebSocket para sincronização em tempo real com o servidor */
 import { WS_URL } from '../constants';
 import { SensorLog } from '../types';
+import { logDebug } from '../utils/log';
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 type StateListener = (state: ConnectionState) => void;
@@ -40,18 +41,18 @@ class WebSocketService {
   /** Inicia a conexão WebSocket com o servidor */
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
-      console.log('[WS] Já conectado ou conectando, ignorando.');
+      logDebug('[WS] Já conectado ou conectando, ignorando.');
       return;
     }
 
     this.setState('connecting');
-    console.log(`[WS] Conectando a ${WS_URL}...`);
+    logDebug(`[WS] Conectando a ${WS_URL}...`);
 
     try {
       this.ws = new WebSocket(WS_URL);
 
       this.ws.onopen = () => {
-        console.log('[WS] Conexão estabelecida!');
+        logDebug('[WS] Conexão estabelecida!');
         this.reconnectAttempts = 0;
         this.setState('connected');
       };
@@ -59,7 +60,7 @@ class WebSocketService {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data as string);
-          console.log('[WS] Mensagem recebida:', data);
+          logDebug('[WS] Mensagem recebida:', data);
 
           // Processa ack de sincronização
           if (data.type === 'sync_ack' && data.requestId) {
@@ -69,7 +70,7 @@ class WebSocketService {
               this.pendingAcks.delete(data.requestId);
             }
           }
-        } catch (err) {
+        } catch {
           console.warn('[WS] Mensagem inválida recebida:', event.data);
         }
       };
@@ -79,7 +80,7 @@ class WebSocketService {
       };
 
       this.ws.onclose = (event) => {
-        console.log(`[WS] Conexão fechada (code=${event.code}, reason=${event.reason})`);
+        logDebug(`[WS] Conexão fechada (code=${event.code}, reason=${event.reason})`);
         this.ws = null;
         this.setState('disconnected');
         this.scheduleReconnect();
@@ -91,10 +92,13 @@ class WebSocketService {
     }
   }
 
-  /** Envia logs via WebSocket. Retorna a quantidade inserida ou null se falhar. */
-  async sendLogs(logs: SensorLog[]): Promise<number | null> {
+  /**
+   * Envia logs via WebSocket. Retorna a quantidade inserida ou null se falhar.
+   * O token (JWT) é opcional: se presente, o servidor associa os logs ao usuário.
+   */
+  async sendLogs(logs: SensorLog[], token: string | null = null): Promise<number | null> {
     if (!this.isConnected || !this.ws) {
-      console.log('[WS] Não conectado, impossível enviar via WS.');
+      logDebug('[WS] Não conectado, impossível enviar via WS.');
       return null;
     }
 
@@ -119,9 +123,10 @@ class WebSocketService {
             type: 'sync',
             requestId,
             logs,
+            ...(token ? { token } : {}),
           })
         );
-        console.log(`[WS] Enviados ${logs.length} logs (requestId=${requestId})`);
+        logDebug(`[WS] Enviados ${logs.length} logs (requestId=${requestId})`);
       } catch (error) {
         clearTimeout(timeout);
         this.pendingAcks.delete(requestId);
@@ -134,7 +139,7 @@ class WebSocketService {
   /** Agenda reconexão com backoff exponencial */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('[WS] Máximo de tentativas atingido. Desistindo da reconexão.');
+      logDebug('[WS] Máximo de tentativas atingido. Desistindo da reconexão.');
       return;
     }
 
@@ -143,7 +148,7 @@ class WebSocketService {
       this.maxDelay
     );
 
-    console.log(`[WS] Reconectando em ${delay / 1000}s (tentativa ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})...`);
+    logDebug(`[WS] Reconectando em ${delay / 1000}s (tentativa ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})...`);
     this.setState('reconnecting');
 
     this.reconnectTimer = setTimeout(() => {
@@ -154,7 +159,7 @@ class WebSocketService {
 
   /** Desconecta e limpa todos os recursos */
   disconnect(): void {
-    console.log('[WS] Desconectando...');
+    logDebug('[WS] Desconectando...');
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

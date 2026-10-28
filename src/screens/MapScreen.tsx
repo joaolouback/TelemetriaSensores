@@ -5,7 +5,7 @@
  * Mostra a posição do usuário em tempo real, os pontos de coleta da API,
  * o raio de geofence de cada ponto e o trajeto percorrido.
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,14 +14,23 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Modal,
 } from 'react-native';
 import MapView, { Marker, Circle, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useLiveLocation } from '../hooks/useLiveLocation';
 import { usePontos } from '../hooks/usePontos';
+import { useColetas } from '../hooks/useColetas';
+import { useAuth } from '../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import { vibrarSelecao } from '../utils/vibracao';
+import { useDesafio } from '../contexts/DesafioContext';
+import { PlacarDesafio, COR_DESAFIO } from '../components/PlacarDesafio';
+import { ARColetaScreen } from './ARColetaScreen';
 import { CAMPUS_UVV, MAP_DEFAULT_DELTA, HOME_COLORS } from '../constants';
 import { formatDistancia, formatNumber } from '../utils';
-import { PontoComDistancia } from '../types';
+import { LocationData, PontoComDistancia, ResultadoCheckin } from '../types';
 import { MAP_LIGHT_STYLE } from '../constants/mapStyle';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const REGIAO_INICIAL: Region = {
   latitude: CAMPUS_UVV.latitude,
@@ -30,8 +39,37 @@ const REGIAO_INICIAL: Region = {
   longitudeDelta: MAP_DEFAULT_DELTA,
 };
 
-export function MapScreen() {
-  const { localizacao, trajeto, permissao, erro: erroLocal, limparTrajeto } = useLiveLocation(true);
+interface Props {
+  /** A aba do mapa está na tela. Fora dela o GPS de alta frequência fica desligado. */
+  visivel: boolean;
+}
+
+export function MapScreen({ visivel }: Props) {
+  const insets = useSafeAreaInsets();
+  /** Onde terminam o cabeçalho flutuante e começam os avisos (placar, geofence, erro). */
+  const topoAlertas = insets.top + 92;
+  const {
+    localizacao: localizacaoReal,
+    trajeto,
+    permissao,
+    erro: erroLocal,
+    limparTrajeto,
+  } = useLiveLocation(visivel);
+
+  /**
+   * Modo simulação (só em desenvolvimento): segurar um ponto da lista "teleporta"
+   * o jogador para ele. Substitui o GPS no mapa, no geofence e no check-in, para
+   * testar a coleta em AR longe do campus. Some no build de produção (`__DEV__`).
+   */
+  const [simulacao, setSimulacao] = useState<{ nome: string; latitude: number; longitude: number } | null>(null);
+  const localizacao = useMemo<LocationData | null>(
+    () =>
+      simulacao
+        ? { latitude: simulacao.latitude, longitude: simulacao.longitude, accuracy: 0, timestamp: Date.now() }
+        : localizacaoReal,
+    [simulacao, localizacaoReal]
+  );
+
   const {
     pontosComDistancia,
     pontoMaisProximo,
@@ -40,6 +78,29 @@ export function MapScreen() {
     erro: erroPontos,
     recarregar,
   } = usePontos(localizacao);
+
+  const { coletados, marcarColetado } = useColetas();
+  const { atualizarPontuacao } = useAuth();
+  const { desafio, pendentes, ajusteRelogio, atualizar: atualizarDesafio } = useDesafio();
+  const desafioEmAndamento = desafio?.status === 'EM_ANDAMENTO' ? desafio : null;
+  /** Ponto aberto na câmera de AR (null = câmera fechada). */
+  const [pontoAR, setPontoAR] = useState<PontoComDistancia | null>(null);
+
+  // Ponto do raio atual que ainda vale algo — habilita o botão da câmera.
+  // Os do desafio vêm primeiro: contam mesmo que já tenham sido coletados antes.
+  const pontoParaColetar =
+    pontosAtivos.find((p) => pendentes.has(p.id)) ??
+    pontosAtivos.find((p) => !coletados.has(p.id)) ??
+    null;
+
+  const handleColetado = useCallback(
+    (pontoId: number, resultado: ResultadoCheckin) => {
+      marcarColetado(pontoId);
+      atualizarPontuacao(resultado.pontuacaoTotal);
+      if (resultado.desafio) atualizarDesafio();
+    },
+    [marcarColetado, atualizarPontuacao, atualizarDesafio]
+  );
 
   const mapRef = useRef<MapView | null>(null);
   const [seguindoUsuario, setSeguindoUsuario] = useState(true);
@@ -118,32 +179,60 @@ export function MapScreen() {
         toolbarEnabled={false}
         onPanDrag={() => setSeguindoUsuario(false)}
       >
-        {pontosComDistancia.map((ponto) => (
-          <React.Fragment key={ponto.id}>
-            <Circle
-              center={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-              radius={ponto.raioGeofence}
-              strokeWidth={2}
-              strokeColor={ponto.dentroDoRaio ? HOME_COLORS.success : HOME_COLORS.discoverBlue}
-              fillColor={
-                ponto.dentroDoRaio
-                  ? 'rgba(16, 185, 129, 0.25)'
-                  : 'rgba(59, 91, 219, 0.12)'
-              }
-            />
-            <Marker
-              coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-              title={ponto.nome}
-              description={
-                Number.isNaN(ponto.distanciaMetros)
-                  ? ponto.descricao ?? ''
-                  : `${formatDistancia(ponto.distanciaMetros)} · ${ponto.pontosRecompensa} pts`
-              }
-              pinColor={ponto.dentroDoRaio ? HOME_COLORS.success : HOME_COLORS.discoverBlue}
-              onPress={() => setPontoSelecionado(ponto)}
-            />
-          </React.Fragment>
-        ))}
+        {pontosComDistancia.map((ponto) => {
+          const doDesafio = pendentes.has(ponto.id);
+          return (
+            <React.Fragment key={ponto.id}>
+              <Circle
+                center={{ latitude: ponto.latitude, longitude: ponto.longitude }}
+                radius={ponto.raioGeofence}
+                strokeWidth={doDesafio ? 3 : 2}
+                strokeColor={
+                  ponto.dentroDoRaio ? HOME_COLORS.success : doDesafio ? COR_DESAFIO : HOME_COLORS.discoverBlue
+                }
+                fillColor={
+                  ponto.dentroDoRaio
+                    ? 'rgba(16, 185, 129, 0.25)'
+                    : doDesafio
+                      ? 'rgba(249, 115, 22, 0.18)'
+                      : 'rgba(59, 91, 219, 0.12)'
+                }
+              />
+              <Marker
+                coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
+                title={doDesafio ? `⚔️ ${ponto.nome}` : ponto.nome}
+                description={
+                  Number.isNaN(ponto.distanciaMetros)
+                    ? ponto.descricao ?? ''
+                    : `${formatDistancia(ponto.distanciaMetros)} · ` +
+                      (doDesafio
+                        ? 'ponto do desafio'
+                        : coletados.has(ponto.id)
+                          ? 'coletado ✓'
+                          : `${ponto.pontosRecompensa} pts`)
+                }
+                pinColor={
+                  doDesafio
+                    ? COR_DESAFIO
+                    : coletados.has(ponto.id)
+                      ? HOME_COLORS.xpGold
+                      : ponto.dentroDoRaio
+                        ? HOME_COLORS.success
+                        : HOME_COLORS.discoverBlue
+                }
+                onPress={() => setPontoSelecionado(ponto)}
+              />
+            </React.Fragment>
+          );
+        })}
+
+        {simulacao && (
+          <Marker
+            coordinate={{ latitude: simulacao.latitude, longitude: simulacao.longitude }}
+            title="Você (simulado)"
+            pinColor={HOME_COLORS.discoverPurple}
+          />
+        )}
 
         {trajeto.length > 1 && (
           <Polyline
@@ -155,30 +244,97 @@ export function MapScreen() {
       </MapView>
 
       {/* Cabeçalho flutuante (Tema Claro) */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         <View style={styles.headerTextos}>
           <Text style={styles.headerTitulo}>Mapa do Campus</Text>
-          <Text style={styles.headerSubtitulo}>
-            {localizacao
-              ? `${formatNumber(localizacao.latitude, 5)}, ${formatNumber(localizacao.longitude, 5)}` +
-                (localizacao.accuracy ? `  ±${Math.round(localizacao.accuracy)}m` : '')
-              : 'Obtendo sinal de GPS...'}
+          <Text style={[styles.headerSubtitulo, simulacao && styles.headerSimulacao]}>
+            {simulacao
+              ? `🧪 Simulando posição em ${simulacao.nome}`
+              : localizacao
+                ? `${formatNumber(localizacao.latitude, 5)}, ${formatNumber(localizacao.longitude, 5)}` +
+                  (localizacao.accuracy ? `  ±${Math.round(localizacao.accuracy)}m` : '')
+                : 'Obtendo sinal de GPS...'}
           </Text>
         </View>
-        {carregando && <ActivityIndicator color={HOME_COLORS.discoverBlue} />}
+        {simulacao ? (
+          <TouchableOpacity
+            style={styles.botaoSairSimulacao}
+            onPress={() => setSimulacao(null)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Sair da simulação e usar o GPS real"
+          >
+            <Text style={styles.botaoSairSimulacaoTexto}>Usar GPS</Text>
+          </TouchableOpacity>
+        ) : (
+          carregando && <ActivityIndicator color={HOME_COLORS.discoverBlue} />
+        )}
       </View>
 
-      {/* Aviso de geofence ativo */}
-      {pontosAtivos.length > 0 && (
-        <View style={styles.alertaGeofence}>
-          <Text style={styles.alertaTexto}>
-            Você chegou em {pontosAtivos.map((p) => p.nome).join(', ')}
-          </Text>
+      {/* Placar do desafio em andamento */}
+      {desafioEmAndamento && (
+        <View style={[styles.placarDesafio, { top: topoAlertas }]}>
+          <PlacarDesafio desafio={desafioEmAndamento} ajusteRelogio={ajusteRelogio} />
         </View>
       )}
 
+      {/* Aviso de geofence ativo */}
+      {pontosAtivos.length > 0 && (
+        <View style={[styles.alertaGeofence, { top: desafioEmAndamento ? topoAlertas + 48 : topoAlertas }]}>
+          <Text style={styles.alertaTexto}>
+            Você chegou em {pontosAtivos.map((p) => p.nome).join(', ')}
+          </Text>
+          {pontoParaColetar ? (
+            <TouchableOpacity
+              style={styles.botaoAR}
+              onPress={() => {
+                vibrarSelecao();
+                setPontoAR(pontoParaColetar);
+              }}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir câmera de realidade aumentada em ${pontoParaColetar.nome}`}
+            >
+              <Ionicons name="camera" size={18} color={HOME_COLORS.successText} />
+              <Text style={styles.botaoARTexto}>
+                Abrir câmera AR ·{' '}
+                {pendentes.has(pontoParaColetar.id)
+                  ? coletados.has(pontoParaColetar.id)
+                    ? 'vale para o desafio'
+                    : `+${pontoParaColetar.pontosRecompensa} pts e desafio`
+                  : `+${pontoParaColetar.pontosRecompensa} pts`}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.alertaSubtexto}>Você já coletou o objeto daqui ✓</Text>
+          )}
+        </View>
+      )}
+
+      <Modal
+        visible={pontoAR !== null}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setPontoAR(null)}
+      >
+        {/* O Modal abre uma janela nova no Android: precisa do próprio provider de área segura. */}
+        <SafeAreaProvider>
+          {pontoAR && (
+            <ARColetaScreen
+              ponto={pontoAR}
+              localizacao={localizacao}
+              onFechar={() => setPontoAR(null)}
+              onColetado={handleColetado}
+              onJaColetado={marcarColetado}
+              jaColetado={coletados.has(pontoAR.id)}
+              valeNoDesafio={pendentes.has(pontoAR.id)}
+            />
+          )}
+        </SafeAreaProvider>
+      </Modal>
+
       {erroPontos && (
-        <TouchableOpacity style={styles.alertaErro} onPress={recarregar} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.alertaErro, { top: topoAlertas }]} onPress={recarregar} activeOpacity={0.8}>
           <Text style={styles.alertaErroTexto}>{erroPontos}</Text>
           <Text style={styles.alertaErroAcao}>Toque para tentar de novo</Text>
         </TouchableOpacity>
@@ -208,6 +364,9 @@ export function MapScreen() {
               style={[styles.botao, seguindoUsuario && styles.botaoAtivo]}
               onPress={handleRecentralizar}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ selected: seguindoUsuario }}
+              accessibilityLabel={seguindoUsuario ? 'Seguindo sua posição' : 'Centralizar o mapa em você'}
             >
               <Text style={[styles.botaoTexto, seguindoUsuario && styles.botaoTextoAtivo]}>
                 {seguindoUsuario ? 'Seguindo' : 'Centralizar'}
@@ -218,6 +377,8 @@ export function MapScreen() {
               onPress={limparTrajeto}
               activeOpacity={0.8}
               disabled={trajeto.length === 0}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: trajeto.length === 0 }}
             >
               <Text style={styles.botaoSecundarioTexto}>
                 Limpar rota ({trajeto.length})
@@ -254,12 +415,29 @@ export function MapScreen() {
                   600
                 );
               }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                `${ponto.nome}, ${formatDistancia(ponto.distanciaMetros)}` +
+                (pendentes.has(ponto.id) ? ', ponto do desafio' : coletados.has(ponto.id) ? ', já coletado' : '')
+              }
+              accessibilityHint="Mostra o ponto no mapa"
+              onLongPress={
+                __DEV__
+                  ? () => {
+                      setSimulacao({ nome: ponto.nome, latitude: ponto.latitude, longitude: ponto.longitude });
+                      setSeguindoUsuario(true);
+                    }
+                  : undefined
+              }
             >
               <Text style={styles.chipNome} numberOfLines={1}>
+                {pendentes.has(ponto.id) && <Ionicons name="flash" size={12} color={COR_DESAFIO} />}
+                {pendentes.has(ponto.id) ? ' ' : ''}
                 {ponto.nome}
               </Text>
               <Text style={[styles.chipDistancia, ponto.dentroDoRaio && { color: HOME_COLORS.success }]}>
                 {formatDistancia(ponto.distanciaMetros)}
+                {coletados.has(ponto.id) ? '  ✓' : ''}
               </Text>
             </TouchableOpacity>
           ))}
@@ -302,7 +480,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 52,
     paddingBottom: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderBottomWidth: 1,
@@ -328,9 +505,23 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontVariant: ['tabular-nums'],
   },
+  headerSimulacao: {
+    color: HOME_COLORS.discoverPurple,
+    fontWeight: '700',
+  },
+  botaoSairSimulacao: {
+    backgroundColor: HOME_COLORS.discoverPurple,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  botaoSairSimulacaoTexto: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
   alertaGeofence: {
     position: 'absolute',
-    top: 116,
     left: 16,
     right: 16,
     backgroundColor: HOME_COLORS.success,
@@ -345,9 +536,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  placarDesafio: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+  },
+  alertaSubtexto: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  botaoAR: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  botaoARTexto: {
+    color: HOME_COLORS.successText,
+    fontWeight: '800',
+    fontSize: 14,
+    textAlign: 'center',
+  },
   alertaErro: {
     position: 'absolute',
-    top: 116,
     left: 16,
     right: 16,
     backgroundColor: '#EF4444',

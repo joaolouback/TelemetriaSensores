@@ -7,6 +7,20 @@ export function calculateMagnitude(x: number, y: number, z: number): number {
 }
 
 
+export function validarEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+
+/** "Maria da Silva" → "MS"; "Arthur" → "AR". */
+export function obterIniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '?';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+
 export function formatTimestamp(timestamp: number | string): string {
   const date = new Date(typeof timestamp === 'string' ? timestamp : timestamp);
   return date.toLocaleString('pt-BR', {

@@ -1,35 +1,90 @@
 /** Gerenciamento do banco de dados SQLite local e persistência de logs */
 import * as SQLite from 'expo-sqlite';
-import { DATABASE_NAME, TABLE_NAME } from '../constants';
-import { SensorLog } from '../types';
+import { DATABASE_NAME, TABLE_NAME, LEGACY_TABLE_NAME, SESSION_TABLE_NAME } from '../constants';
+import { SensorLog, Sessao } from '../types';
+import { logDebug } from '../utils/log';
 
 let db: SQLite.SQLiteDatabase | null = null;
+// Guarda a inicialização em andamento: AuthProvider e TelemetriaProvider chamam
+// initDatabase() ao mesmo tempo na abertura do app, e só pode haver uma conexão.
+let initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 
-export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (db) return db;
+export function initDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (db) return Promise.resolve(db);
+  if (!initPromise) {
+    initPromise = openAndMigrate().catch((err) => {
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
+}
 
-  db = await SQLite.openDatabaseAsync(DATABASE_NAME);
 
-  await db.execAsync(`
+async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+  const database = await SQLite.openDatabaseAsync(DATABASE_NAME);
+
+  // Colunas iguais às da classe TelemetriaSensor do diagrama (snake_case, como no Postgres).
+  await database.execAsync(`
     PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sensor_type TEXT NOT NULL,
-      latitude REAL,
-      longitude REAL,
-      accel_x REAL,
-      accel_y REAL,
-      accel_z REAL,
+      usuario_id INTEGER,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      acelerometro_x REAL,
+      acelerometro_y REAL,
+      acelerometro_z REAL,
       magnitude REAL,
-      battery_level REAL,
-      network_type TEXT,
-      synced INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
+      nivel_bateria INTEGER,
+      tipo_rede TEXT,
+      timestamp TEXT NOT NULL,
+      synced INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_${TABLE_NAME}_synced ON ${TABLE_NAME} (synced, id);
+    CREATE TABLE IF NOT EXISTS ${SESSION_TABLE_NAME} (
+      chave TEXT PRIMARY KEY NOT NULL,
+      valor TEXT NOT NULL
     );
   `);
 
-  return db;
+  await migrarTabelaLegada(database);
+
+  db = database;
+  return database;
+}
+
+
+/**
+ * Copia os registros da tabela antiga (`sensor_logs`) para o novo formato e a remove.
+ * Registros sem GPS são descartados: sem coordenadas não servem para geolocalização.
+ */
+async function migrarTabelaLegada(database: SQLite.SQLiteDatabase): Promise<void> {
+  const legado = await database.getFirstAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
+    [LEGACY_TABLE_NAME]
+  );
+  if (!legado) return;
+
+  await database.withTransactionAsync(async () => {
+    await database.execAsync(`
+      INSERT INTO ${TABLE_NAME}
+        (latitude, longitude, acelerometro_x, acelerometro_y, acelerometro_z, magnitude,
+         nivel_bateria, tipo_rede, timestamp, synced)
+      SELECT
+        latitude, longitude, accel_x, accel_y, accel_z, magnitude,
+        CASE WHEN battery_level IS NULL THEN NULL
+             WHEN battery_level <= 1 THEN CAST(ROUND(battery_level * 100) AS INTEGER)
+             ELSE CAST(ROUND(battery_level) AS INTEGER) END,
+        network_type, created_at, synced
+      FROM ${LEGACY_TABLE_NAME}
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+      DROP TABLE ${LEGACY_TABLE_NAME};
+    `);
+  });
+
+  logDebug(`[DB] Tabela ${LEGACY_TABLE_NAME} migrada para ${TABLE_NAME}.`);
 }
 
 
@@ -51,21 +106,22 @@ export async function insertSensorLog(log: Omit<SensorLog, 'id'>): Promise<numbe
   };
 
   const result = await database.runAsync(
-    `INSERT INTO ${TABLE_NAME} 
-     (sensor_type, latitude, longitude, accel_x, accel_y, accel_z, magnitude, battery_level, network_type, synced, created_at)
+    `INSERT INTO ${TABLE_NAME}
+     (usuario_id, latitude, longitude, acelerometro_x, acelerometro_y, acelerometro_z,
+      magnitude, nivel_bateria, tipo_rede, timestamp, synced)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      log.sensor_type || 'unknown',
-      sanitize(log.latitude),
-      sanitize(log.longitude),
-      sanitize(log.accel_x),
-      sanitize(log.accel_y),
-      sanitize(log.accel_z),
+      log.usuario_id ?? null,
+      log.latitude,
+      log.longitude,
+      sanitize(log.acelerometro_x),
+      sanitize(log.acelerometro_y),
+      sanitize(log.acelerometro_z),
       sanitize(log.magnitude),
-      sanitize(log.battery_level),
-      log.network_type || null,
+      sanitize(log.nivel_bateria),
+      log.tipo_rede || null,
+      log.timestamp || new Date().toISOString(),
       log.synced ?? 0,
-      log.created_at || new Date().toISOString(),
     ]
   );
   return result.lastInsertRowId;
@@ -103,11 +159,45 @@ export async function deleteAllLogs(): Promise<void> {
 }
 
 
-export async function getUnsyncedLogs(): Promise<SensorLog[]> {
+/**
+ * Logs ainda não enviados que podem ser sincronizados pelo usuário atual:
+ * os dele e os coletados sem ninguém logado. Logs de outro usuário que
+ * saiu da conta ficam aguardando o próximo login dele.
+ */
+export async function getUnsyncedLogs(usuarioId: number | null, limite: number): Promise<SensorLog[]> {
   const database = getDatabase();
+  if (usuarioId === null) {
+    return await database.getAllAsync<SensorLog>(
+      `SELECT * FROM ${TABLE_NAME} WHERE synced = 0 AND usuario_id IS NULL ORDER BY id ASC LIMIT ?`,
+      [limite]
+    );
+  }
   return await database.getAllAsync<SensorLog>(
-    `SELECT * FROM ${TABLE_NAME} WHERE synced = 0 ORDER BY id ASC`
+    `SELECT * FROM ${TABLE_NAME}
+     WHERE synced = 0 AND (usuario_id IS NULL OR usuario_id = ?)
+     ORDER BY id ASC LIMIT ?`,
+    [usuarioId, limite]
   );
+}
+
+/**
+ * Apaga os registros já sincronizados mais antigos que `dias`. O servidor já tem
+ * uma cópia; sem isso o SQLite cresce ~2.900 linhas por dia de coleta.
+ */
+export async function limparLogsSincronizados(dias: number): Promise<number> {
+  const database = getDatabase();
+  const limite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+  const resultado = await database.runAsync(
+    `DELETE FROM ${TABLE_NAME} WHERE synced = 1 AND timestamp < ?`,
+    [limite]
+  );
+  return resultado.changes;
+}
+
+/** Apaga o que ainda não foi enviado — usado quando o usuário revoga o consentimento. */
+export async function deleteUnsyncedLogs(): Promise<void> {
+  const database = getDatabase();
+  await database.runAsync(`DELETE FROM ${TABLE_NAME} WHERE synced = 0`);
 }
 
 
@@ -116,17 +206,66 @@ export async function markLogsAsSynced(ids: number[]): Promise<void> {
   const database = getDatabase();
   const placeholders = ids.map(() => '?').join(',');
 
-  console.log(`[DB] Executando UPDATE: marcando IDs ${ids.join(',')} como sincronizados.`);
-
-  await database.runAsync(
+  const { changes } = await database.runAsync(
     `UPDATE ${TABLE_NAME} SET synced = 1 WHERE id IN (${placeholders})`,
     ids
   );
+  logDebug(`[DB] ${changes} registros marcados como sincronizados.`);
+}
 
-  // Verificação rápida
-  const check = await database.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM ${TABLE_NAME} WHERE id IN (${placeholders}) AND synced = 1`,
-    ids
+
+// ─── Sessão do usuário ───────────────────────────────────────────────
+// Guardada no próprio SQLite para o app abrir logado mesmo sem internet.
+
+const CHAVE_SESSAO = 'sessao_atual';
+
+export async function getSessao(): Promise<Sessao | null> {
+  const database = await initDatabase();
+  const row = await database.getFirstAsync<{ valor: string }>(
+    `SELECT valor FROM ${SESSION_TABLE_NAME} WHERE chave = ?`,
+    [CHAVE_SESSAO]
   );
-  console.log(`[DB] Verificação: ${check?.count} registros agora estão com synced=1.`);
+  if (!row) return null;
+  try {
+    return JSON.parse(row.valor) as Sessao;
+  } catch {
+    return null;
+  }
+}
+
+export async function salvarSessao(sessao: Sessao): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO ${SESSION_TABLE_NAME} (chave, valor) VALUES (?, ?)`,
+    [CHAVE_SESSAO, JSON.stringify(sessao)]
+  );
+}
+
+export async function limparSessao(): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(`DELETE FROM ${SESSION_TABLE_NAME} WHERE chave = ?`, [CHAVE_SESSAO]);
+}
+
+
+// ─── Consentimento da telemetria (LGPD) ──────────────────────────────
+// Fica no aparelho, e não na conta: a coleta pode começar antes do login.
+
+const CHAVE_CONSENTIMENTO = 'consentimento_telemetria';
+
+/** `true`/`false` se o usuário já decidiu; `null` se ainda não respondeu. */
+export async function getConsentimentoTelemetria(): Promise<boolean | null> {
+  const database = await initDatabase();
+  const row = await database.getFirstAsync<{ valor: string }>(
+    `SELECT valor FROM ${SESSION_TABLE_NAME} WHERE chave = ?`,
+    [CHAVE_CONSENTIMENTO]
+  );
+  return row ? row.valor === 'sim' : null;
+}
+
+export async function salvarConsentimentoTelemetria(aceito: boolean): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO ${SESSION_TABLE_NAME} (chave, valor) VALUES (?, ?)`,
+    [CHAVE_CONSENTIMENTO, aceito ? 'sim' : 'nao']
+  );
 }
