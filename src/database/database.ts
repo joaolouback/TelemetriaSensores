@@ -269,3 +269,26 @@ export async function salvarConsentimentoTelemetria(aceito: boolean): Promise<vo
     [CHAVE_CONSENTIMENTO, aceito ? 'sim' : 'nao']
   );
 }
+
+
+// ─── Preferência de tema (claro/escuro) ──────────────────────────────
+
+const CHAVE_TEMA = 'preferencia_tema';
+type PreferenciaTema = 'sistema' | 'claro' | 'escuro';
+
+export async function getPreferenciaTema(): Promise<PreferenciaTema> {
+  const database = await initDatabase();
+  const row = await database.getFirstAsync<{ valor: string }>(
+    `SELECT valor FROM ${SESSION_TABLE_NAME} WHERE chave = ?`,
+    [CHAVE_TEMA]
+  );
+  return row?.valor === 'claro' || row?.valor === 'escuro' ? row.valor : 'sistema';
+}
+
+export async function salvarPreferenciaTema(preferencia: PreferenciaTema): Promise<void> {
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO ${SESSION_TABLE_NAME} (chave, valor) VALUES (?, ?)`,
+    [CHAVE_TEMA, preferencia]
+  );
+}

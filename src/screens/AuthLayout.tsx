@@ -16,10 +16,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
 import { useTelemetria } from '../contexts/TelemetriaContext';
 import { CollectionStatus } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 interface AuthLayoutProps {
   titulo: string;
@@ -32,6 +33,8 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }: AuthLayoutProps) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const insets = useSafeAreaInsets();
   const { status, consentimento } = useTelemetria();
   const coletando = status === CollectionStatus.COLLECTING;
@@ -41,7 +44,7 @@ export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }:
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={HOME_COLORS.accent} />
+      <StatusBar barStyle="light-content" backgroundColor={cores.accent} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -50,7 +53,7 @@ export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }:
       >
         <View style={[styles.hero, { paddingTop: insets.top + 40 }]}>
           <View style={styles.logo}>
-            <Ionicons name="location" size={30} color={HOME_COLORS.xpGold} />
+            <Ionicons name="location" size={30} color={cores.xpGold} />
           </View>
           <Text style={styles.marca}>UVV Go</Text>
           <Text style={styles.slogan}>Explore o campus, desbloqueie conquistas</Text>
@@ -62,7 +65,7 @@ export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }:
 
           {!!erro && (
             <View style={styles.alerta} accessibilityLiveRegion="polite">
-              <Ionicons name="alert-circle" size={18} color="#B91C1C" />
+              <Ionicons name="alert-circle" size={18} color={cores.erroTexto} />
               <Text style={styles.alertaTexto}>{erro}</Text>
             </View>
           )}
@@ -105,17 +108,17 @@ export function AuthLayout({ titulo, subtitulo, children, erro, botao, rodape }:
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 32,
   },
   hero: {
-    backgroundColor: HOME_COLORS.accent,
+    backgroundColor: cores.accent,
     alignItems: 'center',
     paddingBottom: 72,
     borderBottomLeftRadius: 32,
@@ -142,13 +145,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   card: {
-    backgroundColor: HOME_COLORS.card,
+    backgroundColor: cores.card,
     marginHorizontal: 20,
     marginTop: -44,
     borderRadius: 24,
     padding: 22,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -158,11 +161,11 @@ const styles = StyleSheet.create({
   titulo: {
     fontSize: 22,
     fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
   subtitulo: {
     fontSize: 14,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     marginTop: 4,
     marginBottom: 20,
   },
@@ -170,23 +173,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: cores.erroFundo,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: cores.erroBorda,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
   },
   alertaTexto: {
     flex: 1,
-    color: '#B91C1C',
+    color: cores.erroTexto,
     fontSize: 13,
     fontWeight: '600',
   },
   botao: {
     height: 52,
     borderRadius: 14,
-    backgroundColor: HOME_COLORS.accent,
+    backgroundColor: cores.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
@@ -206,12 +209,12 @@ const styles = StyleSheet.create({
   },
   rodapeTexto: {
     fontSize: 14,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
   },
   rodapeLink: {
     fontSize: 14,
     fontWeight: '800',
-    color: HOME_COLORS.discoverBlue,
+    color: cores.discoverBlue,
   },
   coleta: {
     flexDirection: 'row',
@@ -225,14 +228,14 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: HOME_COLORS.textMuted,
+    backgroundColor: cores.textMuted,
   },
   coletaPontoAtivo: {
-    backgroundColor: HOME_COLORS.success,
+    backgroundColor: cores.success,
   },
   coletaTexto: {
     fontSize: 12,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontWeight: '500',
   },
 });

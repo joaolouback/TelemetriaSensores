@@ -7,6 +7,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Desafio } from '../types';
 import { useTempoRestante } from '../hooks/useTempoRestante';
+import { useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 /** Cor dos pontos do desafio no mapa (e do placar). */
 export const COR_DESAFIO = '#F97316';
@@ -17,6 +19,7 @@ interface Props {
 }
 
 export function PlacarDesafio({ desafio, ajusteRelogio }: Props) {
+  const styles = useEstilos(criarEstilos);
   const { texto, restanteMs } = useTempoRestante(desafio.terminaEm, ajusteRelogio);
   const total = desafio.pontos.length;
   const nomeOponente = desafio.oponente?.nome.trim().split(/\s+/)[0] ?? 'Oponente';
@@ -42,7 +45,7 @@ export function PlacarDesafio({ desafio, ajusteRelogio }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   placar: {
     flexDirection: 'row',
     alignItems: 'center',

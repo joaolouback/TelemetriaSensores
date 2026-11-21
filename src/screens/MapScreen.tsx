@@ -26,11 +26,14 @@ import { vibrarSelecao } from '../utils/vibracao';
 import { useDesafio } from '../contexts/DesafioContext';
 import { PlacarDesafio, COR_DESAFIO } from '../components/PlacarDesafio';
 import { ARColetaScreen } from './ARColetaScreen';
-import { CAMPUS_UVV, MAP_DEFAULT_DELTA, HOME_COLORS } from '../constants';
+import { CAMPUS_UVV, MAP_DEFAULT_DELTA } from '../constants';
 import { formatDistancia, formatNumber } from '../utils';
 import { LocationData, PontoComDistancia, ResultadoCheckin } from '../types';
-import { MAP_LIGHT_STYLE } from '../constants/mapStyle';
+import { MAP_DARK_STYLE, MAP_LIGHT_STYLE } from '../constants/mapStyle';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import { useNavegacao } from '../contexts/NavegacaoContext';
+import type { Tema } from '../constants/temas';
 
 const REGIAO_INICIAL: Region = {
   latitude: CAMPUS_UVV.latitude,
@@ -45,6 +48,8 @@ interface Props {
 }
 
 export function MapScreen({ visivel }: Props) {
+  const styles = useEstilos(criarEstilos);
+  const { cores, escuro, barraStatus } = useTema();
   const insets = useSafeAreaInsets();
   /** Onde terminam o cabeçalho flutuante e começam os avisos (placar, geofence, erro). */
   const topoAlertas = insets.top + 92;
@@ -107,6 +112,28 @@ export function MapScreen({ visivel }: Props) {
   const [pontoSelecionado, setPontoSelecionado] = useState<PontoComDistancia | null>(null);
   const jaCentralizou = useRef(false);
 
+  // "Ver no mapa" no detalhe de um local (Início): seleciona e centraliza o ponto pedido.
+  // A lista de pontos vem por ref para não recentralizar a cada leitura do GPS.
+  const { pontoEmFoco } = useNavegacao();
+  const pontosRef = useRef(pontosComDistancia);
+  pontosRef.current = pontosComDistancia;
+  useEffect(() => {
+    if (!pontoEmFoco) return;
+    const ponto = pontosRef.current.find((p) => p.id === pontoEmFoco.id);
+    if (!ponto) return;
+    setPontoSelecionado(ponto);
+    setSeguindoUsuario(false);
+    mapRef.current?.animateToRegion(
+      {
+        latitude: ponto.latitude,
+        longitude: ponto.longitude,
+        latitudeDelta: MAP_DEFAULT_DELTA / 2,
+        longitudeDelta: MAP_DEFAULT_DELTA / 2,
+      },
+      600
+    );
+  }, [pontoEmFoco]);
+
   /** Centraliza a câmera na posição do usuário. */
   const centralizar = useCallback(
     (animado: boolean = true) => {
@@ -156,7 +183,7 @@ export function MapScreen({ visivel }: Props) {
   if (permissao === 'negada') {
     return (
       <View style={styles.centro}>
-        <StatusBar barStyle="dark-content" backgroundColor={HOME_COLORS.background} />
+        <StatusBar barStyle={barraStatus} backgroundColor={cores.background} />
         <Text style={styles.tituloErro}>Localização bloqueada</Text>
         <Text style={styles.textoErro}>{erroLocal}</Text>
       </View>
@@ -165,13 +192,13 @@ export function MapScreen({ visivel }: Props) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={HOME_COLORS.background} />
+      <StatusBar barStyle={barraStatus} backgroundColor={cores.background} />
 
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
         provider={PROVIDER_GOOGLE}
-        customMapStyle={MAP_LIGHT_STYLE}
+        customMapStyle={escuro ? MAP_DARK_STYLE : MAP_LIGHT_STYLE}
         initialRegion={REGIAO_INICIAL}
         showsUserLocation
         showsMyLocationButton={false}
@@ -188,7 +215,7 @@ export function MapScreen({ visivel }: Props) {
                 radius={ponto.raioGeofence}
                 strokeWidth={doDesafio ? 3 : 2}
                 strokeColor={
-                  ponto.dentroDoRaio ? HOME_COLORS.success : doDesafio ? COR_DESAFIO : HOME_COLORS.discoverBlue
+                  ponto.dentroDoRaio ? cores.success : doDesafio ? COR_DESAFIO : cores.discoverBlue
                 }
                 fillColor={
                   ponto.dentroDoRaio
@@ -200,7 +227,7 @@ export function MapScreen({ visivel }: Props) {
               />
               <Marker
                 coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-                title={doDesafio ? `⚔️ ${ponto.nome}` : ponto.nome}
+                title={doDesafio ? `Desafio: ${ponto.nome}` : ponto.nome}
                 description={
                   Number.isNaN(ponto.distanciaMetros)
                     ? ponto.descricao ?? ''
@@ -215,10 +242,10 @@ export function MapScreen({ visivel }: Props) {
                   doDesafio
                     ? COR_DESAFIO
                     : coletados.has(ponto.id)
-                      ? HOME_COLORS.xpGold
+                      ? cores.xpGold
                       : ponto.dentroDoRaio
-                        ? HOME_COLORS.success
-                        : HOME_COLORS.discoverBlue
+                        ? cores.success
+                        : cores.discoverBlue
                 }
                 onPress={() => setPontoSelecionado(ponto)}
               />
@@ -230,14 +257,14 @@ export function MapScreen({ visivel }: Props) {
           <Marker
             coordinate={{ latitude: simulacao.latitude, longitude: simulacao.longitude }}
             title="Você (simulado)"
-            pinColor={HOME_COLORS.discoverPurple}
+            pinColor={cores.discoverPurple}
           />
         )}
 
         {trajeto.length > 1 && (
           <Polyline
             coordinates={trajeto}
-            strokeColor={HOME_COLORS.discoverBlue}
+            strokeColor={cores.discoverBlue}
             strokeWidth={4}
           />
         )}
@@ -249,7 +276,7 @@ export function MapScreen({ visivel }: Props) {
           <Text style={styles.headerTitulo}>Mapa do Campus</Text>
           <Text style={[styles.headerSubtitulo, simulacao && styles.headerSimulacao]}>
             {simulacao
-              ? `🧪 Simulando posição em ${simulacao.nome}`
+              ? `Simulando posição em ${simulacao.nome}`
               : localizacao
                 ? `${formatNumber(localizacao.latitude, 5)}, ${formatNumber(localizacao.longitude, 5)}` +
                   (localizacao.accuracy ? `  ±${Math.round(localizacao.accuracy)}m` : '')
@@ -267,7 +294,7 @@ export function MapScreen({ visivel }: Props) {
             <Text style={styles.botaoSairSimulacaoTexto}>Usar GPS</Text>
           </TouchableOpacity>
         ) : (
-          carregando && <ActivityIndicator color={HOME_COLORS.discoverBlue} />
+          carregando && <ActivityIndicator color={cores.discoverBlue} />
         )}
       </View>
 
@@ -295,7 +322,7 @@ export function MapScreen({ visivel }: Props) {
               accessibilityRole="button"
               accessibilityLabel={`Abrir câmera de realidade aumentada em ${pontoParaColetar.nome}`}
             >
-              <Ionicons name="camera" size={18} color={HOME_COLORS.successText} />
+              <Ionicons name="camera" size={18} color={cores.successText} />
               <Text style={styles.botaoARTexto}>
                 Abrir câmera AR ·{' '}
                 {pendentes.has(pontoParaColetar.id)
@@ -351,7 +378,7 @@ export function MapScreen({ visivel }: Props) {
             <Text
               style={[
                 styles.painelDistancia,
-                pontoMaisProximo?.dentroDoRaio && { color: HOME_COLORS.success },
+                pontoMaisProximo?.dentroDoRaio && { color: cores.success },
               ]}
             >
               {pontoMaisProximo ? formatDistancia(pontoMaisProximo.distanciaMetros) : '—'}
@@ -435,7 +462,7 @@ export function MapScreen({ visivel }: Props) {
                 {pendentes.has(ponto.id) ? ' ' : ''}
                 {ponto.nome}
               </Text>
-              <Text style={[styles.chipDistancia, ponto.dentroDoRaio && { color: HOME_COLORS.success }]}>
+              <Text style={[styles.chipDistancia, ponto.dentroDoRaio && { color: cores.success }]}>
                 {formatDistancia(ponto.distanciaMetros)}
                 {coletados.has(ponto.id) ? '  ✓' : ''}
               </Text>
@@ -447,26 +474,26 @@ export function MapScreen({ visivel }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   centro: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
   },
   tituloErro: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 8,
   },
   textoErro: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -481,9 +508,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: cores.superficieTranslucida,
     borderBottomWidth: 1,
-    borderBottomColor: HOME_COLORS.cardBorder,
+    borderBottomColor: cores.cardBorder,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -496,21 +523,21 @@ const styles = StyleSheet.create({
   headerTitulo: {
     fontSize: 20,
     fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     letterSpacing: 0.4,
   },
   headerSubtitulo: {
     fontSize: 12,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     marginTop: 3,
     fontVariant: ['tabular-nums'],
   },
   headerSimulacao: {
-    color: HOME_COLORS.discoverPurple,
+    color: cores.discoverPurple,
     fontWeight: '700',
   },
   botaoSairSimulacao: {
-    backgroundColor: HOME_COLORS.discoverPurple,
+    backgroundColor: cores.discoverPurple,
     borderRadius: 10,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -524,7 +551,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    backgroundColor: HOME_COLORS.success,
+    backgroundColor: cores.success,
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -552,13 +579,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cores.card,
     borderRadius: 10,
     paddingVertical: 10,
     marginTop: 8,
   },
   botaoARTexto: {
-    color: HOME_COLORS.successText,
+    color: cores.successText,
     fontWeight: '800',
     fontSize: 14,
     textAlign: 'center',
@@ -590,9 +617,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: cores.superficieTranslucida,
     borderTopWidth: 1,
-    borderTopColor: HOME_COLORS.cardBorder,
+    borderTopColor: cores.cardBorder,
     paddingTop: 14,
     paddingBottom: 18,
     elevation: 8,
@@ -613,19 +640,19 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   painelRotulo: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   painelValor: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     marginTop: 2,
   },
   painelDistancia: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 13,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
@@ -634,19 +661,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   botao: {
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
   },
   botaoAtivo: {
-    backgroundColor: HOME_COLORS.discoverBlue,
-    borderColor: HOME_COLORS.discoverBlue,
+    backgroundColor: cores.discoverBlue,
+    borderColor: cores.discoverBlue,
   },
   botaoTexto: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontWeight: '700',
     fontSize: 12,
     textAlign: 'center',
@@ -659,7 +686,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   botaoSecundarioTexto: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 11,
     textAlign: 'center',
   },
@@ -668,29 +695,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: HOME_COLORS.card,
+    backgroundColor: cores.card,
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     minWidth: 120,
   },
   chipAtivo: {
-    borderColor: HOME_COLORS.success,
-    backgroundColor: HOME_COLORS.successBg,
+    borderColor: cores.success,
+    backgroundColor: cores.successBg,
   },
   chipSelecionado: {
-    backgroundColor: '#EEF2FF',
-    borderColor: HOME_COLORS.discoverBlue,
+    backgroundColor: cores.destaqueSuave,
+    borderColor: cores.discoverBlue,
   },
   chipNome: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 12,
     fontWeight: '600',
   },
   chipDistancia: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 11,
     marginTop: 2,
     fontVariant: ['tabular-nums'],

@@ -8,9 +8,10 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
 import { PontoDeInteresse, ResultadoCheckin } from '../types';
 import { urlDoServidor } from '../utils/url';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 interface Props {
   ponto: PontoDeInteresse;
@@ -19,6 +20,8 @@ interface Props {
 }
 
 export function CardLocal({ ponto, resultado, onFechar }: Props) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const { desafio } = resultado;
   const venceu = desafio?.resultado === 'vitoria';
 
@@ -53,7 +56,7 @@ export function CardLocal({ ponto, resultado, onFechar }: Props) {
 
         {desafio && (
           <View style={[styles.linhaIcone, styles.desafio, venceu && styles.desafioVitoria]}>
-            <Ionicons name={venceu ? 'trophy' : 'flash'} size={18} color={venceu ? '#B45309' : HOME_COLORS.accent} />
+            <Ionicons name={venceu ? 'trophy' : 'flash'} size={18} color={venceu ? cores.avisoTexto : cores.accent} />
             <Text style={styles.desafioTexto}>
               {venceu
                 ? `Você venceu o desafio! +${desafio.bonus} pontos de bônus`
@@ -64,7 +67,7 @@ export function CardLocal({ ponto, resultado, onFechar }: Props) {
 
         {resultado.novasConquistas.map((c) => (
           <View key={c.id} style={[styles.linhaIcone, styles.conquista]}>
-            <Ionicons name="ribbon" size={18} color={HOME_COLORS.xpGold} />
+            <Ionicons name="ribbon" size={18} color={cores.xpGold} />
             <Text style={styles.conquistaTexto}>Conquista desbloqueada: {c.titulo}</Text>
           </View>
         ))}
@@ -74,7 +77,7 @@ export function CardLocal({ ponto, resultado, onFechar }: Props) {
         {ponto.curiosidade ? (
           <View style={styles.curiosidade}>
             <View style={styles.linhaIcone}>
-              <Ionicons name="bulb" size={16} color={HOME_COLORS.xpGold} />
+              <Ionicons name="bulb" size={16} color={cores.xpGold} />
               <Text style={styles.curiosidadeRotulo}>Você sabia?</Text>
             </View>
             <Text style={styles.curiosidadeTexto}>{ponto.curiosidade}</Text>
@@ -89,14 +92,14 @@ export function CardLocal({ ponto, resultado, onFechar }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   cartao: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    backgroundColor: cores.superficieTranslucida,
     borderRadius: 18,
     padding: 16,
     maxHeight: 520,
     borderWidth: 2,
-    borderColor: HOME_COLORS.success,
+    borderColor: cores.success,
     elevation: 10,
   },
   conteudo: {
@@ -107,16 +110,16 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 12,
     marginBottom: 12,
-    backgroundColor: HOME_COLORS.cardBorder,
+    backgroundColor: cores.cardBorder,
   },
   rotulo: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   titulo: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 22,
     fontWeight: '900',
     marginTop: 2,
@@ -135,12 +138,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   seloPontos: {
-    color: HOME_COLORS.successText,
-    backgroundColor: HOME_COLORS.successBg,
+    color: cores.successText,
+    backgroundColor: cores.successBg,
   },
   seloNeutro: {
-    color: HOME_COLORS.textSecondary,
-    backgroundColor: HOME_COLORS.background,
+    color: cores.textSecondary,
+    backgroundColor: cores.background,
   },
   linhaIcone: {
     flexDirection: 'row',
@@ -151,14 +154,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: HOME_COLORS.missionIconBg,
+    backgroundColor: cores.missionIconBg,
   },
   desafioVitoria: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: cores.avisoFundo,
   },
   desafioTexto: {
     flex: 1,
-    color: HOME_COLORS.accent,
+    color: cores.accent,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -167,12 +170,12 @@ const styles = StyleSheet.create({
   },
   conquistaTexto: {
     flex: 1,
-    color: HOME_COLORS.accent,
+    color: cores.accent,
     fontSize: 14,
     fontWeight: '700',
   },
   descricao: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 12,
@@ -181,23 +184,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
     borderLeftWidth: 4,
-    borderLeftColor: HOME_COLORS.xpGold,
+    borderLeftColor: cores.xpGold,
   },
   curiosidadeRotulo: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 13,
     fontWeight: '800',
   },
   curiosidadeTexto: {
     marginTop: 4,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
   botao: {
-    backgroundColor: HOME_COLORS.discoverBlue,
+    backgroundColor: cores.discoverBlue,
     borderRadius: 12,
     paddingVertical: 13,
     marginTop: 12,

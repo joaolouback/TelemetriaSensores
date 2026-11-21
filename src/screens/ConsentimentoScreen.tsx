@@ -16,9 +16,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
 import { useTelemetria } from '../contexts/TelemetriaContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 const ITENS = [
   { icone: 'location' as const, titulo: 'Localização (GPS)', texto: 'A cada 30 segundos, enquanto o app está aberto.' },
@@ -27,6 +28,8 @@ const ITENS = [
 ];
 
 export function ConsentimentoScreen() {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const insets = useSafeAreaInsets();
   const { definirConsentimento } = useTelemetria();
   const [salvando, setSalvando] = useState<'sim' | 'nao' | null>(null);
@@ -42,7 +45,7 @@ export function ConsentimentoScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={HOME_COLORS.accent} />
+      <StatusBar barStyle="light-content" backgroundColor={cores.accent} />
 
       <ScrollView contentContainerStyle={styles.conteudo}>
         <View style={[styles.hero, { paddingTop: insets.top + 40 }]}>
@@ -60,7 +63,7 @@ export function ConsentimentoScreen() {
           <Text style={styles.secao}>O que é coletado</Text>
           {ITENS.map((item) => (
             <View key={item.titulo} style={styles.item}>
-              <Ionicons name={item.icone} size={22} color={HOME_COLORS.discoverBlue} style={styles.itemIcone} />
+              <Ionicons name={item.icone} size={22} color={cores.discoverBlue} style={styles.itemIcone} />
               <View style={styles.itemTextos}>
                 <Text style={styles.itemTitulo}>{item.titulo}</Text>
                 <Text style={styles.itemTexto}>{item.texto}</Text>
@@ -105,7 +108,7 @@ export function ConsentimentoScreen() {
           accessibilityRole="button"
         >
           {salvando === 'nao' ? (
-            <ActivityIndicator color={HOME_COLORS.textSecondary} />
+            <ActivityIndicator color={cores.textSecondary} />
           ) : (
             <Text style={styles.botaoRecusarTexto}>Continuar sem compartilhar</Text>
           )}
@@ -115,16 +118,16 @@ export function ConsentimentoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   conteudo: {
     paddingBottom: 32,
   },
   hero: {
-    backgroundColor: HOME_COLORS.accent,
+    backgroundColor: cores.accent,
     paddingBottom: 48,
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -145,17 +148,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   card: {
-    backgroundColor: HOME_COLORS.card,
+    backgroundColor: cores.card,
     marginHorizontal: 16,
     marginTop: -24,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     elevation: 3,
   },
   secao: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 15,
     fontWeight: '800',
     marginTop: 8,
@@ -173,23 +176,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitulo: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 14,
     fontWeight: '700',
   },
   itemTexto: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 13,
     marginTop: 1,
   },
   paragrafo: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 6,
   },
   botaoAceitar: {
-    backgroundColor: HOME_COLORS.accent,
+    backgroundColor: cores.accent,
     marginHorizontal: 16,
     marginTop: 20,
     borderRadius: 12,
@@ -208,7 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   botaoRecusarTexto: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },

@@ -7,7 +7,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { RegistroScreen } from './src/screens/RegistroScreen';
 import { ConsentimentoScreen } from './src/screens/ConsentimentoScreen';
 import { DesafioProvider } from './src/contexts/DesafioContext';
-import { HOME_COLORS } from './src/constants';
+import { TemaProvider, useTema } from './src/contexts/TemaContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErroBoundary } from './src/components/ErroBoundary';
 
@@ -19,11 +19,12 @@ function Conteudo() {
   const { usuario, carregando } = useAuth();
   const { consentimento } = useTelemetria();
   const [telaAuth, setTelaAuth] = useState<'login' | 'registro'>('login');
+  const { cores } = useTema();
 
   if (carregando || consentimento === undefined) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: HOME_COLORS.background }}>
-        <ActivityIndicator size="large" color={HOME_COLORS.accent} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.background }}>
+        <ActivityIndicator size="large" color={cores.accent} />
       </View>
     );
   }
@@ -53,13 +54,15 @@ export default function App() {
   // a coleta começa assim que o app abre, mesmo antes de o usuário entrar.
   return (
     <SafeAreaProvider>
-      <ErroBoundary>
-        <AuthProvider>
-          <TelemetriaProvider>
-            <Conteudo />
-          </TelemetriaProvider>
-        </AuthProvider>
-      </ErroBoundary>
+      <TemaProvider>
+        <ErroBoundary>
+          <AuthProvider>
+            <TelemetriaProvider>
+              <Conteudo />
+            </TelemetriaProvider>
+          </AuthProvider>
+        </ErroBoundary>
+      </TemaProvider>
     </SafeAreaProvider>
   );
 }

@@ -7,13 +7,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
+import { TemaContext } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 interface State {
   erro: Error | null;
 }
 
 export class ErroBoundary extends React.Component<{ children: React.ReactNode }, State> {
+  static contextType = TemaContext;
+
   state: State = { erro: null };
 
   static getDerivedStateFromError(erro: Error): State {
@@ -27,9 +30,12 @@ export class ErroBoundary extends React.Component<{ children: React.ReactNode },
   render() {
     if (!this.state.erro) return this.props.children;
 
+    const { cores } = this.context as React.ContextType<typeof TemaContext>;
+    const styles = criarEstilos(cores);
+
     return (
       <View style={styles.container}>
-        <Ionicons name="alert-circle-outline" size={56} color={HOME_COLORS.textMuted} />
+        <Ionicons name="alert-circle-outline" size={56} color={cores.textMuted} />
         <Text style={styles.titulo}>Algo deu errado</Text>
         <Text style={styles.texto}>
           Uma parte do app encontrou um problema. Seus dados estão salvos — tente de novo.
@@ -48,35 +54,35 @@ export class ErroBoundary extends React.Component<{ children: React.ReactNode },
   }
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   titulo: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 20,
     fontWeight: '800',
     marginTop: 12,
   },
   texto: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
     marginTop: 8,
   },
   detalhe: {
-    color: '#B91C1C',
+    color: cores.erroTexto,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 12,
   },
   botao: {
-    backgroundColor: HOME_COLORS.accent,
+    backgroundColor: cores.accent,
     borderRadius: 12,
     paddingVertical: 13,
     paddingHorizontal: 28,

@@ -4,11 +4,38 @@ Aplicativo Android do projeto **UVV Go**: plataforma mobile gamificada baseada e
 geolocalização e realidade aumentada para exploração do campus da Universidade Vila Velha.
 
 Desenvolvido em React Native e Expo (SDK 54). Evoluído a partir da Prova de Conceito de
-telemetria offline-first, que segue funcionando na aba *Sensores*.
+telemetria offline-first, que segue funcionando em segundo plano.
 
 > **Primeira vez neste projeto?** Este app precisa do **backend rodando** para
 > carregar os pontos do campus. Siga o roteiro completo de instalação e teste no
 > **`SETUP.md` do repositório `TelemetriaSensores_API`** — ele cobre as duas partes.
+
+## 🎓 Sobre o projeto
+
+O **UVV Go** é um **Trabalho de Conclusão de Curso (TCC)** de Ciência da Computação da
+Universidade Vila Velha (UVV).
+
+### Como começou
+O projeto nasceu como um **estudo de coleta de dados de sensores em celulares Android**:
+um app de telemetria *offline-first* que lia GPS, acelerômetro, bateria e estado da rede,
+guardava tudo em SQLite no aparelho e sincronizava com um servidor quando havia conexão.
+
+### Onde está hoje
+Essa base de telemetria foi mantida (agora com consentimento LGPD) e serve de alicerce para
+uma **plataforma gamificada de exploração do campus**, com geolocalização e realidade
+aumentada: o aluno caminha pelo campus, chega aos pontos de interesse, coleta cristais em AR,
+ganha pontos e conquistas, sobe no ranking e pode desafiar um amigo em uma corrida 1x1.
+
+### Objetivo
+Incentivar alunos (especialmente calouros) a conhecer os espaços da universidade de forma
+lúdica, e avaliar se a gamificação com geolocalização e AR aumenta o engajamento na
+exploração do campus — sem perder a coleta de telemetria que originou o estudo.
+
+### Próximos passos
+Coleta das coordenadas reais dos pontos em campo, validação com usuários, ajustes finais e,
+possivelmente, publicação na **Google Play Store**.
+
+O backend está em outro repositório: [TelemetriaSensores_API](https://github.com/joaolouback/TelemetriaSensores_API).
 
 ## 🚀 Funcionalidades
 
@@ -45,6 +72,11 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
   aparece no topo. O placar do oponente se atualiza a cada 5 segundos (`DesafioContext`).
 - **No Perfil**: placar de vitórias, derrotas e empates.
 
+### Ranking, conquistas e perfil
+- **Ranking**: classificação dos jogadores por pontuação; tocar em um jogador abre o perfil dele.
+- **Conquistas**: medalhas desbloqueadas conforme a pontuação.
+- **Perfil**: foto escolhida da galeria, nível, vitórias/derrotas e tema claro/escuro.
+
 ### Conta de usuário
 - **Login e registro** (e-mail e senha) validados pelo backend (`/api/auth/*`).
 - A sessão fica salva no SQLite: o app abre já logado, mesmo sem internet.
@@ -53,7 +85,7 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 - **Consentimento (LGPD)**: na primeira abertura, a tela *Sua privacidade* explica o que é
   coletado e para quê. Só com o aceite a coleta começa — automaticamente, inclusive na tela
   de login, e offline. Recusar não muda o jogo. O interruptor no *Perfil* desliga a coleta e
-  apaga do aparelho o que ainda não foi enviado. A aba *Sensores* permite pausar/retomar.
+  apaga do aparelho o que ainda não foi enviado. O mesmo interruptor retoma a coleta.
 - **Tabela `telemetria_sensor`**: mesmas colunas da classe `TelemetriaSensor` do
   diagrama (`latitude`, `longitude`, `acelerometro_x/y/z`, `magnitude`,
   `nivel_bateria`, `tipo_rede`, `timestamp`) + `usuario_id` e `synced`. Leituras sem
@@ -87,12 +119,12 @@ telemetria offline-first, que segue funcionando na aba *Sensores*.
 A arquitetura do projeto segue a separação por responsabilidades:
 ```
 src/
-├── components/     → Componentes visuais (CardLocal, CardDesafio, PlacarDesafio, SensorCard...)
+├── components/     → Componentes visuais (CardLocal, CardDesafio, PlacarDesafio, Avatar...)
 ├── constants/      → Constantes do sistema (cores, intervalos, estilo do mapa)
 ├── database/       → Abstrações e instâncias CRUD do SQLite
 ├── hooks/          → Hooks de lógica global (sensores, sqlite, coleta, localização, pontos)
-├── navigation/     → Alternância entre as telas (Mapa / Sensores)
-├── screens/        → Telas principais (MapScreen, ARColetaScreen, DashboardScreen)
+├── navigation/     → Alternância entre as telas (Início / Mapa / Ranking / Perfil)
+├── screens/        → Telas principais (HomeScreen, MapScreen, ARColetaScreen, RankingScreen, ProfileScreen)
 ├── sensors/        → Isolamento da lógica de listeners de sensores nativos
 ├── services/       → Comunicação com o backend (api, websocket, pontos, interacoes, desafios)
 ├── types/          → Interfaces TypeScript e Enums

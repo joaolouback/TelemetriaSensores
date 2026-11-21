@@ -2,7 +2,8 @@
 import React, { forwardRef, useState } from 'react';
 import { View, Text, TextInput, TextInputProps, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 interface CampoTextoProps extends TextInputProps {
   rotulo: string;
@@ -15,6 +16,8 @@ export const CampoTexto = forwardRef<TextInput, CampoTextoProps>(function CampoT
   { rotulo, icone, erro, senha = false, style, ...inputProps },
   ref
 ) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const [focado, setFocado] = useState(false);
   const [visivel, setVisivel] = useState(false);
 
@@ -31,14 +34,14 @@ export const CampoTexto = forwardRef<TextInput, CampoTextoProps>(function CampoT
         <Ionicons
           name={icone}
           size={20}
-          color={erro ? '#EF4444' : focado ? HOME_COLORS.discoverBlue : HOME_COLORS.textMuted}
+          color={erro ? '#EF4444' : focado ? cores.discoverBlue : cores.textMuted}
         />
         <TextInput
           ref={ref}
           autoCorrect={false}
           {...inputProps}
           style={[styles.input, style]}
-          placeholderTextColor={HOME_COLORS.textMuted}
+          placeholderTextColor={cores.textMuted}
           secureTextEntry={senha && !visivel}
           onFocus={(e) => {
             setFocado(true);
@@ -58,7 +61,7 @@ export const CampoTexto = forwardRef<TextInput, CampoTextoProps>(function CampoT
             <Ionicons
               name={visivel ? 'eye-off-outline' : 'eye-outline'}
               size={20}
-              color={HOME_COLORS.textMuted}
+              color={cores.textMuted}
             />
           </TouchableOpacity>
         )}
@@ -68,14 +71,14 @@ export const CampoTexto = forwardRef<TextInput, CampoTextoProps>(function CampoT
   );
 });
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   wrapper: {
     marginBottom: 16,
   },
   rotulo: {
     fontSize: 13,
     fontWeight: '700',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     marginBottom: 6,
   },
   caixa: {
@@ -86,12 +89,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: HOME_COLORS.cardBorder,
-    backgroundColor: HOME_COLORS.background,
+    borderColor: cores.cardBorder,
+    backgroundColor: cores.background,
   },
   caixaFocada: {
-    borderColor: HOME_COLORS.discoverBlue,
-    backgroundColor: HOME_COLORS.card,
+    borderColor: cores.discoverBlue,
+    backgroundColor: cores.card,
   },
   caixaErro: {
     borderColor: '#EF4444',
@@ -99,7 +102,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     paddingVertical: 0,
   },
   erro: {

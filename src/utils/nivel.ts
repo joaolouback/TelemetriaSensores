@@ -32,3 +32,17 @@ export function calcularNivel(pontuacaoTotal: number): Nivel {
     progresso: pontosNoNivel / PONTOS_POR_NIVEL,
   };
 }
+
+export interface InfoNivel {
+  nivel: number;
+  titulo: string;
+  /** Pontuação total necessária para alcançar o nível. */
+  pontosMinimos: number;
+}
+
+/** Os níveis com título próprio (do 1 ao último título); depois dele, o título se mantém. */
+export const NIVEIS: InfoNivel[] = TITULOS.map((titulo, i) => ({
+  nivel: i + 1,
+  titulo,
+  pontosMinimos: i * PONTOS_POR_NIVEL,
+}));

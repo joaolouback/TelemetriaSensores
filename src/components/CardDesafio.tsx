@@ -18,19 +18,24 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
 import { useDesafio } from '../contexts/DesafioContext';
 import { useTempoRestante } from '../hooks/useTempoRestante';
 import { DesafioError } from '../services/desafios';
 import { Desafio } from '../types';
 import { COR_DESAFIO } from './PlacarDesafio';
+import { DesafioInfo } from './DesafioInfo';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0] ?? 'Oponente';
 
 export function CardDesafio() {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const { desafio, ajusteRelogio, criar, entrar, sair, dispensarResultado } = useDesafio();
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [infoAberta, setInfoAberta] = useState(false);
 
   /** Executa uma ação mostrando carregamento e a mensagem de erro, se houver. */
   const executar = async (acao: () => Promise<void>) => {
@@ -78,11 +83,24 @@ export function CardDesafio() {
     <View style={styles.card}>
       {conteudo}
       {erro && <Text style={styles.erro}>{erro}</Text>}
+      <TouchableOpacity
+        style={styles.infoLink}
+        onPress={() => setInfoAberta(true)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Como funciona o desafio e histórico de partidas"
+      >
+        <Ionicons name="information-circle-outline" size={16} color={cores.textSecondary} />
+        <Text style={styles.infoLinkTexto}>Como funciona e histórico</Text>
+      </TouchableOpacity>
+      <DesafioInfo visivel={infoAberta} onFechar={() => setInfoAberta(false)} />
     </View>
   );
 }
 
 function SemDesafio(props: { ocupado: boolean; onCriar: () => void; onEntrar: (codigo: string) => void }) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const [digitando, setDigitando] = useState(false);
   const [codigo, setCodigo] = useState('');
 
@@ -100,7 +118,7 @@ function SemDesafio(props: { ocupado: boolean; onCriar: () => void; onEntrar: (c
             value={codigo}
             onChangeText={(t) => setCodigo(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
             placeholder="CÓDIGO"
-            placeholderTextColor={HOME_COLORS.textMuted}
+            placeholderTextColor={cores.textMuted}
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={6}
@@ -126,12 +144,13 @@ function SemDesafio(props: { ocupado: boolean; onCriar: () => void; onEntrar: (c
 }
 
 function Aguardando(props: { desafio: Desafio; ajusteRelogio: number; ocupado: boolean; onCancelar: () => void }) {
+  const styles = useEstilos(criarEstilos);
   const { desafio } = props;
   const { texto } = useTempoRestante(desafio.conviteExpiraEm, props.ajusteRelogio);
 
   const compartilhar = () =>
     Share.share({
-      message: `Te desafio no UVV Go! ⚔️ Abra o app, toque em "Tenho um código" e digite: ${desafio.codigo}`,
+      message: `Te desafio no UVV Go! Abra o app, toque em "Tenho um código" e digite: ${desafio.codigo}`,
     }).catch(() => undefined);
 
   return (
@@ -151,6 +170,7 @@ function Aguardando(props: { desafio: Desafio; ajusteRelogio: number; ocupado: b
 }
 
 function EmAndamento(props: { desafio: Desafio; ajusteRelogio: number; onDesistir: () => void }) {
+  const styles = useEstilos(criarEstilos);
   const { desafio } = props;
   const { texto } = useTempoRestante(desafio.terminaEm, props.ajusteRelogio);
   const meus = new Set(desafio.eu.coletados);
@@ -192,6 +212,7 @@ function EmAndamento(props: { desafio: Desafio; ajusteRelogio: number; onDesisti
 }
 
 function Resultado(props: { desafio: Desafio; onFechar: () => void }) {
+  const styles = useEstilos(criarEstilos);
   const { desafio } = props;
   const total = desafio.pontos.length;
   const placar = `${desafio.eu.coletados.length}/${total} × ${desafio.oponente?.coletados.length ?? 0}/${total}`;
@@ -219,6 +240,7 @@ function Resultado(props: { desafio: Desafio; onFechar: () => void }) {
 }
 
 function Titulo({ icone, children }: { icone: keyof typeof Ionicons.glyphMap; children: React.ReactNode }) {
+  const styles = useEstilos(criarEstilos);
   return (
     <View style={styles.tituloLinha}>
       <Ionicons name={icone} size={20} color={COR_DESAFIO} />
@@ -231,12 +253,14 @@ function Titulo({ icone, children }: { icone: keyof typeof Ionicons.glyphMap; ch
 
 /** Célula da tabela: coletado ou não, com descrição para o leitor de tela. */
 function Marca({ feito, quem }: { feito: boolean; quem: string }) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   return (
     <View style={styles.celula} accessibilityLabel={`${quem}: ${feito ? 'coletado' : 'falta coletar'}`}>
       <Ionicons
         name={feito ? 'checkmark-circle' : 'ellipse-outline'}
         size={20}
-        color={feito ? HOME_COLORS.success : HOME_COLORS.textMuted}
+        color={feito ? cores.success : cores.textMuted}
       />
     </View>
   );
@@ -250,6 +274,7 @@ function Botao(props: {
   desabilitado?: boolean;
   compacto?: boolean;
 }) {
+  const styles = useEstilos(criarEstilos);
   const inativo = props.ocupado || props.desabilitado;
   return (
     <TouchableOpacity
@@ -275,15 +300,30 @@ function Botao(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   card: {
-    backgroundColor: HOME_COLORS.card,
+    backgroundColor: cores.card,
     borderRadius: 16,
     padding: 16,
     marginTop: 20,
     marginBottom: 24,
     borderWidth: 2,
     borderColor: COR_DESAFIO,
+  },
+  infoLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: cores.cardBorder,
+  },
+  infoLinkTexto: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: cores.textSecondary,
   },
   cabecalho: {
     flexDirection: 'row',
@@ -298,7 +338,7 @@ const styles = StyleSheet.create({
   },
   titulo: {
     flexShrink: 1,
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 17,
     fontWeight: '800',
   },
@@ -309,13 +349,13 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   texto: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,
   },
   textoPequeno: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
@@ -371,18 +411,18 @@ const styles = StyleSheet.create({
   inputCodigo: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: 6,
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
   tabela: {
     marginTop: 10,
     borderRadius: 10,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
     paddingVertical: 4,
   },
   linha: {
@@ -392,14 +432,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   cabecalhoTabela: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   celulaPonto: {
     flex: 1,
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -408,14 +448,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   desistir: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 12,
     textDecorationLine: 'underline',
   },
   placarFinal: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 22,
     fontWeight: '900',
     textAlign: 'center',
@@ -423,7 +463,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   erro: {
-    color: '#B91C1C',
+    color: cores.erroTexto,
     fontSize: 13,
     marginTop: 10,
     textAlign: 'center',

@@ -6,24 +6,24 @@
  * - Mapa (MapScreen em tema claro)
  * - Ranking (RankingScreen)
  * - Perfil (ProfileScreen)
- * - Sensores (DashboardScreen para conferência)
  */
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeScreen } from '../screens/HomeScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { RankingScreen } from '../screens/RankingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { DashboardScreen } from '../screens/DashboardScreen';
-import { HOME_COLORS } from '../constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { vibrarSelecao } from '../utils/vibracao';
+import { NavegacaoContext, PontoEmFoco } from '../contexts/NavegacaoContext';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
 /** Altura da barra de abas, sem contar a área da navegação do sistema. */
 const ALTURA_BARRA = 64;
 
-type Aba = 'inicio' | 'mapa' | 'ranking' | 'perfil' | 'sensores';
+type Aba = 'inicio' | 'mapa' | 'ranking' | 'perfil';
 
 interface TabItem {
   id: Aba;
@@ -57,22 +57,25 @@ const TABS: TabItem[] = [
     iconActive: 'person',
     iconInactive: 'person-outline',
   },
-  {
-    id: 'sensores',
-    label: 'Sensores',
-    iconActive: 'stats-chart',
-    iconInactive: 'stats-chart-outline',
-  },
 ];
 
 export function BottomTabs() {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const [aba, setAba] = useState<Aba>('inicio');
+  const [pontoEmFoco, setPontoEmFoco] = useState<PontoEmFoco | null>(null);
+  const irParaPonto = useCallback((id: number) => {
+    setPontoEmFoco((atual) => ({ id, pedido: (atual?.pedido ?? 0) + 1 }));
+    setAba('mapa');
+  }, []);
+  const navegacao = useMemo(() => ({ irParaPonto, pontoEmFoco }), [irParaPonto, pontoEmFoco]);
   // No Android edge-to-edge o app desenha sob a barra de navegação do sistema:
   // a barra de abas cresce para não ficar embaixo dos botões/gestos.
   const { bottom } = useSafeAreaInsets();
   const alturaBarra = ALTURA_BARRA + bottom;
 
   return (
+    <NavegacaoContext.Provider value={navegacao}>
     <View style={styles.container}>
       <View style={[styles.tela, { bottom: alturaBarra }, aba !== 'inicio' && styles.escondida]} pointerEvents={aba === 'inicio' ? 'auto' : 'none'}>
         <HomeScreen />
@@ -87,16 +90,13 @@ export function BottomTabs() {
       <View style={[styles.tela, { bottom: alturaBarra }, aba !== 'perfil' && styles.escondida]} pointerEvents={aba === 'perfil' ? 'auto' : 'none'}>
         <ProfileScreen />
       </View>
-      <View style={[styles.tela, { bottom: alturaBarra }, aba !== 'sensores' && styles.escondida]} pointerEvents={aba === 'sensores' ? 'auto' : 'none'}>
-        <DashboardScreen />
-      </View>
 
       {/* Barra de Navegação Inferior com Ícones Vetoriais */}
       <View accessibilityRole="tablist" style={[styles.barra, { height: alturaBarra, paddingBottom: 8 + bottom }]}>
         {TABS.map((tab) => {
           const ativo = aba === tab.id;
           const iconName = ativo ? tab.iconActive : tab.iconInactive;
-          const color = ativo ? HOME_COLORS.accent : HOME_COLORS.textMuted;
+          const color = ativo ? cores.accent : cores.textMuted;
 
           return (
             <TouchableOpacity
@@ -120,13 +120,14 @@ export function BottomTabs() {
         })}
       </View>
     </View>
+    </NavegacaoContext.Provider>
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   tela: {
     ...StyleSheet.absoluteFillObject,
@@ -140,9 +141,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    backgroundColor: HOME_COLORS.card,
+    backgroundColor: cores.card,
     borderTopWidth: 1,
-    borderTopColor: HOME_COLORS.cardBorder,
+    borderTopColor: cores.cardBorder,
     paddingTop: 6,
     elevation: 12,
     shadowColor: '#000',
@@ -156,13 +157,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabTexto: {
-    color: HOME_COLORS.textMuted,
+    color: cores.textMuted,
     fontSize: 11,
     fontWeight: '600',
     marginTop: 3,
   },
   tabTextoAtivo: {
-    color: HOME_COLORS.accent,
+    color: cores.accent,
     fontWeight: '800',
   },
 });

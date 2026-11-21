@@ -5,8 +5,9 @@
  * (via ViroReact) para encontrar o chão e posicionar o objeto 3D do ponto. Só ao
  * tocar no objeto o check-in é enviado e os pontos são creditados.
  *
- * Se nenhuma superfície for detectada em alguns segundos (chão liso, pouca luz),
- * o objeto aparece flutuando à frente da câmera para não travar o jogador.
+ * Se nenhuma superfície for detectada em ~10 s (chão liso, pouca luz), o app sugere
+ * dicas e oferece um botão para mostrar o objeto flutuando à frente da câmera. Sem
+ * ação do jogador, ele aparece sozinho depois de mais alguns segundos.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -21,9 +22,11 @@ import {
 import {
   ViroARSceneNavigator,
   ViroARScene,
-  ViroARPlane,
+  ViroARPlaneSelector,
   ViroNode,
   Viro3DObject,
+  ViroSphere,
+  ViroMaterials,
   ViroAmbientLight,
   ViroDirectionalLight,
   ViroAnimations,
@@ -31,7 +34,6 @@ import {
   isARSupportedOnDevice,
   requestRequiredPermissions,
 } from '@reactvision/react-viro';
-import { HOME_COLORS } from '../constants';
 import { CardLocal } from '../components/CardLocal';
 import { urlDoServidor } from '../utils/url';
 import { vibrarSucesso, vibrarErro } from '../utils/vibracao';
@@ -39,11 +41,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { registrarCheckin, CheckinError } from '../services/interacoes';
 import { LocationData, PontoComDistancia, ResultadoCheckin } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
-/** Tempo procurando o chão antes de mostrar o objeto flutuando. */
-const TEMPO_BUSCA_SUPERFICIE_MS = 8_000;
+/** Tempo procurando o chão antes de sugerir dicas e o botão de mostrar o objeto. */
+const TEMPO_DICA_MS = 10_000;
+/** Tempo procurando o chão antes de mostrar o objeto flutuando automaticamente. */
+const TEMPO_BUSCA_SUPERFICIE_MS = 20_000;
 const MODELO_PADRAO = '/modelos/cristal.glb';
 const ESCALA_PADRAO = 0.25;
+
+ViroMaterials.createMaterials({
+  // Usado no lugar do modelo 3D se o download do GLB falhar.
+  cristalReserva: { diffuseColor: '#29B6F6', lightingModel: 'Blinn' },
+});
 
 ViroAnimations.registerAnimations({
   girar: { properties: { rotateY: '+=90' }, duration: 1000 },
@@ -57,6 +68,8 @@ ViroAnimations.registerAnimations({
     easing: 'EaseIn',
   },
 });
+
+type EstadoModelo = 'carregando' | 'ok' | 'erro';
 
 type Fase =
   | 'verificando'
@@ -75,6 +88,7 @@ interface PropsCena {
   escala: number;
   flutuante: boolean;
   coletado: boolean;
+  onModelo: (estado: EstadoModelo) => void;
   onRastreamento: (normal: boolean) => void;
   onSuperficie: () => void;
   onToque: () => void;
@@ -82,48 +96,95 @@ interface PropsCena {
 
 function Objeto({ cena }: { cena: PropsCena }) {
   const { escala } = cena;
+  const [falhou, setFalhou] = useState(false);
+  const animacao = cena.coletado
+    ? { name: 'coletar', run: true, loop: false }
+    : { name: 'girar', run: true, loop: true };
+  const aoTocar = cena.coletado ? undefined : cena.onToque;
+
   return (
     <ViroNode animation={{ name: 'flutuar', run: !cena.coletado, loop: true }}>
-      <Viro3DObject
-        source={{ uri: cena.modeloUrl }}
-        type={cena.formato}
-        scale={[escala, escala, escala]}
-        animation={
-          cena.coletado
-            ? { name: 'coletar', run: true, loop: false }
-            : { name: 'girar', run: true, loop: true }
-        }
-        onClick={cena.coletado ? undefined : cena.onToque}
-        onError={(e) => console.warn('[AR] Falha ao carregar o modelo 3D:', e.nativeEvent)}
-      />
+      {falhou ? (
+        // Sem o GLB, uma esfera simples permite testar a coleta mesmo assim.
+        <ViroSphere
+          radius={0.1}
+          materials={['cristalReserva']}
+          animation={animacao}
+          onClick={aoTocar}
+        />
+      ) : (
+        <Viro3DObject
+          source={{ uri: cena.modeloUrl }}
+          type={cena.formato}
+          scale={[escala, escala, escala]}
+          animation={animacao}
+          onClick={aoTocar}
+          onLoadStart={() => cena.onModelo('carregando')}
+          onLoadEnd={() => cena.onModelo('ok')}
+          onError={(e) => {
+            console.warn('[AR] Falha ao carregar o modelo 3D:', cena.modeloUrl, e.nativeEvent);
+            setFalhou(true);
+            cena.onModelo('erro');
+          }}
+        />
+      )}
     </ViroNode>
   );
 }
 
+/** Distância à frente da câmera em que o objeto flutuante é colocado. */
+const DISTANCIA_FLUTUANTE_M = 1.0;
+type Ponto3D = [number, number, number];
+
 function CenaColeta(props: { sceneNavigator: { viroAppProps: PropsCena } }) {
   const cena = props.sceneNavigator.viroAppProps;
+
+  // Última posição/direção da câmera: o objeto flutuante nasce na frente de onde o
+  // jogador está olhando quando ele aparece, não de onde a câmera abriu.
+  const camera = useRef<{ posicao: Ponto3D; frente: Ponto3D } | null>(null);
+  const [posicaoFlutuante, setPosicaoFlutuante] = useState<Ponto3D | null>(null);
+
+  useEffect(() => {
+    if (!cena.flutuante || posicaoFlutuante) return;
+    const c = camera.current;
+    setPosicaoFlutuante(
+      c
+        ? [
+            c.posicao[0] + c.frente[0] * DISTANCIA_FLUTUANTE_M,
+            c.posicao[1] + c.frente[1] * DISTANCIA_FLUTUANTE_M,
+            c.posicao[2] + c.frente[2] * DISTANCIA_FLUTUANTE_M,
+          ]
+        : [0, -0.25, -1.2]
+    );
+  }, [cena.flutuante, posicaoFlutuante]);
 
   return (
     <ViroARScene
       onTrackingUpdated={(estado) =>
         cena.onRastreamento(estado === ViroTrackingStateConstants.TRACKING_NORMAL)
       }
+      onCameraTransformUpdate={(t) => {
+        camera.current = { posicao: t.position as Ponto3D, frente: t.forward as Ponto3D };
+      }}
     >
       <ViroAmbientLight color="#FFFFFF" intensity={300} />
       <ViroDirectionalLight color="#FFFFFF" direction={[0, -1, -0.3]} intensity={800} />
 
       {cena.flutuante ? (
-        // Sem chão detectado: 1,2 m à frente e um pouco abaixo de onde a câmera abriu.
-        <ViroNode position={[0, -0.25, -1.2]}>
-          <Objeto cena={cena} />
-        </ViroNode>
+        // Sem chão detectado: 1 m à frente de onde a câmera apontava ao aparecer.
+        posicaoFlutuante && (
+          <ViroNode position={posicaoFlutuante}>
+            <Objeto cena={cena} />
+          </ViroNode>
+        )
       ) : (
-        // O ARPlane só exibe os filhos depois que o ARCore encontra uma superfície.
-        <ViroARPlane minHeight={0.3} minWidth={0.3} alignment="Horizontal" onAnchorFound={cena.onSuperficie}>
+        // O ARCore desenha as áreas translúcidas que encontra no chão. O objeto só é
+        // carregado depois que o jogador toca em uma delas, exatamente no ponto tocado.
+        <ViroARPlaneSelector minHeight={0.3} minWidth={0.3} alignment="HorizontalUpward" onPlaneSelected={cena.onSuperficie}>
           <ViroNode position={[0, 0.2, 0]}>
             <Objeto cena={cena} />
           </ViroNode>
-        </ViroARPlane>
+        </ViroARPlaneSelector>
       )}
     </ViroARScene>
   );
@@ -164,10 +225,13 @@ export function ARColetaScreen({
   jaColetado,
   valeNoDesafio,
 }: Props) {
+  const styles = useEstilos(criarEstilos);
   const insets = useSafeAreaInsets();
   const [fase, setFase] = useState<Fase>('verificando');
   const [rastreando, setRastreando] = useState(false);
   const [flutuante, setFlutuante] = useState(false);
+  const [demorando, setDemorando] = useState(false);
+  const [modelo, setModelo] = useState<EstadoModelo>('carregando');
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
   const [podeTentarDeNovo, setPodeTentarDeNovo] = useState(true);
   const [resultado, setResultado] = useState<ResultadoCheckin | null>(null);
@@ -200,11 +264,15 @@ export function ARColetaScreen({
     };
   }, []);
 
-  // Fallback: sem superfície depois de alguns segundos, mostra o objeto flutuando.
+  // Sem superfície: primeiro sugere dicas e o botão; depois mostra o objeto flutuando sozinho.
   useEffect(() => {
     if (fase !== 'procurando') return;
-    const timer = setTimeout(() => setFlutuante(true), TEMPO_BUSCA_SUPERFICIE_MS);
-    return () => clearTimeout(timer);
+    const dica = setTimeout(() => setDemorando(true), TEMPO_DICA_MS);
+    const fallback = setTimeout(() => setFlutuante(true), TEMPO_BUSCA_SUPERFICIE_MS);
+    return () => {
+      clearTimeout(dica);
+      clearTimeout(fallback);
+    };
   }, [fase]);
 
   const onSuperficie = useCallback(() => {
@@ -250,6 +318,7 @@ export function ARColetaScreen({
     ...resolverModelo(ponto),
     flutuante,
     coletado: fase === 'coletado',
+    onModelo: setModelo,
     onRastreamento: setRastreando,
     onSuperficie,
     onToque,
@@ -296,6 +365,9 @@ export function ARColetaScreen({
           fase={fase}
           rastreando={rastreando}
           flutuante={flutuante}
+          demorando={demorando}
+          modelo={modelo}
+          onMostrarAgora={() => setFlutuante(true)}
           ponto={ponto}
           valor={
             valeNoDesafio && jaColetado
@@ -318,6 +390,10 @@ function Rodape(props: {
   fase: Fase;
   rastreando: boolean;
   flutuante: boolean;
+  /** A busca pelo chão passou de ~10 s: mostra dicas e o botão de mostrar o objeto. */
+  demorando: boolean;
+  modelo: EstadoModelo;
+  onMostrarAgora: () => void;
   ponto: PontoComDistancia;
   /** Texto do que o toque vale (pontos e/ou desafio). */
   valor: string;
@@ -327,13 +403,15 @@ function Rodape(props: {
   /** Ausente quando repetir não adianta (ex.: o ponto já foi coletado). */
   onTentarDeNovo?: () => void;
 }) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
   const { fase, resultado } = props;
 
   switch (fase) {
     case 'verificando':
       return (
         <View style={styles.cartao}>
-          <ActivityIndicator color={HOME_COLORS.discoverBlue} />
+          <ActivityIndicator color={cores.discoverBlue} />
           <Text style={styles.cartaoTexto}>Preparando a câmera...</Text>
         </View>
       );
@@ -365,22 +443,37 @@ function Rodape(props: {
     case 'procurando':
       return (
         <View style={styles.cartao}>
-          <ActivityIndicator color={HOME_COLORS.discoverBlue} />
+          <ActivityIndicator color={cores.discoverBlue} />
           <Text style={styles.cartaoTexto}>
             {props.rastreando
-              ? 'Aponte a câmera para o chão e mova o celular devagar...'
+              ? 'Aponte a câmera para o chão. Quando uma área azul aparecer, toque nela para colocar o cristal.'
               : 'Movimente o celular devagar para o ARCore reconhecer o ambiente...'}
           </Text>
+          {props.demorando && (
+            <>
+              <Text style={styles.cartaoTitulo}>Está difícil achar o chão?</Text>
+              <Text style={styles.cartaoTexto}>
+                Procure um local bem iluminado e uma superfície com textura (piso com
+                desenho, grama, calçada). Evite chão liso, brilhante ou muito escuro.
+              </Text>
+              <Botao texto="Mostrar o objeto mesmo assim" onPress={props.onMostrarAgora} />
+            </>
+          )}
         </View>
       );
 
     case 'pronto':
       return (
         <View style={[styles.cartao, styles.cartaoDestaque]}>
-          <Text style={styles.cartaoTitulo}>Toque no cristal para coletar!</Text>
+          <Text style={styles.cartaoTitulo}>
+            {props.modelo === 'carregando' ? 'Carregando o cristal...' : 'Toque no cristal para coletar!'}
+          </Text>
           <Text style={styles.cartaoTexto}>
             {props.valor}
             {props.flutuante ? ' Olhe ao redor: ele está flutuando à sua frente.' : ''}
+            {props.modelo === 'erro'
+              ? ' Não consegui baixar o modelo 3D da API, então mostro um cristal simples.'
+              : ''}
           </Text>
         </View>
       );
@@ -388,7 +481,7 @@ function Rodape(props: {
     case 'enviando':
       return (
         <View style={styles.cartao}>
-          <ActivityIndicator color={HOME_COLORS.discoverBlue} />
+          <ActivityIndicator color={cores.discoverBlue} />
           <Text style={styles.cartaoTexto}>Validando sua posição...</Text>
         </View>
       );
@@ -411,6 +504,7 @@ function Rodape(props: {
 }
 
 function Botao({ texto, onPress, secundario }: { texto: string; onPress: () => void; secundario?: boolean }) {
+  const styles = useEstilos(criarEstilos);
   return (
     <TouchableOpacity
       style={[styles.botao, secundario && styles.botaoSecundario]}
@@ -423,7 +517,7 @@ function Botao({ texto, onPress, secundario }: { texto: string; onPress: () => v
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -469,7 +563,7 @@ const styles = StyleSheet.create({
     right: 16,
   },
   cartao: {
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: cores.superficieTranslucida,
     borderRadius: 16,
     padding: 18,
     gap: 8,
@@ -478,23 +572,23 @@ const styles = StyleSheet.create({
   },
   cartaoDestaque: {
     borderWidth: 2,
-    borderColor: HOME_COLORS.xpGold,
+    borderColor: cores.xpGold,
   },
   cartaoTitulo: {
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
   },
   cartaoTexto: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
   },
   botao: {
     alignSelf: 'stretch',
-    backgroundColor: HOME_COLORS.discoverBlue,
+    backgroundColor: cores.discoverBlue,
     borderRadius: 12,
     paddingVertical: 12,
     marginTop: 4,
@@ -509,6 +603,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   botaoTextoSecundario: {
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
   },
 });

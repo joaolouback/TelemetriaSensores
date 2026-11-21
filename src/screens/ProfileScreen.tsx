@@ -11,37 +11,88 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HOME_COLORS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelemetria } from '../contexts/TelemetriaContext';
-import { obterIniciais } from '../utils';
+import { Avatar } from '../components/Avatar';
+import { SeloConquista } from '../components/SeloConquista';
+import { enviarFotoPerfil, removerFotoPerfil } from '../services/foto';
 import { calcularNivel } from '../utils/nivel';
 import { useColetas } from '../hooks/useColetas';
 import { useDesafio } from '../contexts/DesafioContext';
 import { buscarPlacarDesafios } from '../services/desafios';
-import { PlacarDesafios } from '../types';
+import { buscarConquistas } from '../services/ranking';
+import { ConquistaDoUsuario, PlacarDesafios } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTema, useEstilos, PreferenciaTema } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
 
-const CONQUISTAS_MOCK = [
-  { id: 1, titulo: 'Primeiro Passo', desc: 'Fez check-in no mapa', icone: '📍' },
-  { id: 2, titulo: 'Explorador UVV', desc: 'Visitou 5 pontos do campus', icone: '🎒' },
-  { id: 3, titulo: 'Mestre da Telemetria', desc: 'Coletou 100 registros', icone: '📊' },
-  { id: 4, titulo: 'Inovador', desc: 'Passou pelo Prédio Inova', icone: '💡' },
+const TEMAS: { id: PreferenciaTema; rotulo: string }[] = [
+  { id: 'sistema', rotulo: 'Sistema' },
+  { id: 'claro', rotulo: 'Claro' },
+  { id: 'escuro', rotulo: 'Escuro' },
 ];
 
 export function ProfileScreen() {
+  const styles = useEstilos(criarEstilos);
+  const { cores, barraStatus } = useTema();
   const insets = useSafeAreaInsets();
-  const { usuario, sair } = useAuth();
+  const { usuario, sair, atualizarUsuario } = useAuth();
+  const { preferencia, definirPreferencia } = useTema();
   const { consentimento, definirConsentimento } = useTelemetria();
   const { coletados } = useColetas();
-  // Pontuação, nível e locais são reais; a lista de conquistas ainda é mock.
   const pontuacao = usuario?.pontuacaoTotal ?? 0;
   const nivel = calcularNivel(pontuacao);
-  const user = {
-    nome: usuario?.nome ?? '',
-    iniciais: usuario ? obterIniciais(usuario.nome) : '',
+  const user = { nome: usuario?.nome ?? '' };
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+
+  const escolherFoto = async () => {
+    // Carregado só aqui: é um módulo nativo, e um APK antigo (sem ele) não pode quebrar o app inteiro.
+    let ImagePicker: typeof import('expo-image-picker');
+    try {
+      ImagePicker = await import('expo-image-picker');
+    } catch {
+      Alert.alert('Atualização necessária', 'Instale a versão mais recente do app para escolher a foto de perfil.');
+      return;
+    }
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+    });
+    if (resultado.canceled) return;
+
+    const imagem = resultado.assets[0];
+    setEnviandoFoto(true);
+    try {
+      atualizarUsuario(await enviarFotoPerfil(imagem.uri, imagem.mimeType));
+    } catch (e) {
+      Alert.alert('Não foi possível salvar a foto', e instanceof Error ? e.message : 'Tente novamente.');
+    } finally {
+      setEnviandoFoto(false);
+    }
+  };
+
+  const removerFoto = async () => {
+    setEnviandoFoto(true);
+    try {
+      atualizarUsuario(await removerFotoPerfil());
+    } catch (e) {
+      Alert.alert('Não foi possível remover a foto', e instanceof Error ? e.message : 'Tente novamente.');
+    } finally {
+      setEnviandoFoto(false);
+    }
+  };
+
+  const abrirOpcoesFoto = () => {
+    Alert.alert('Foto de perfil', undefined, [
+      { text: 'Escolher da galeria', onPress: escolherFoto },
+      ...(usuario?.fotoUrl ? [{ text: 'Remover foto', style: 'destructive' as const, onPress: removerFoto }] : []),
+      { text: 'Cancelar', style: 'cancel' as const },
+    ]);
   };
 
   // Placar dos desafios 1x1. Recarrega quando a pontuação muda (vitória dá bônus).
@@ -52,6 +103,23 @@ export function ProfileScreen() {
       .then(({ vitorias, derrotas, empates }) => setPlacar({ vitorias, derrotas, empates }))
       .catch(() => undefined);
   }, [usuario?.id, pontuacao, desafio?.status]);
+
+  // Conquistas vindas da API; recarrega quando a pontuação muda (uma coleta pode desbloquear).
+  const [conquistas, setConquistas] = useState<ConquistaDoUsuario[]>([]);
+  useEffect(() => {
+    if (!usuario?.id) return;
+    buscarConquistas()
+      .then(setConquistas)
+      .catch(() => undefined);
+  }, [usuario?.id, pontuacao]);
+  const desbloqueadas = conquistas.filter((c) => c.desbloqueada).length;
+
+  const mostrarConquista = (c: ConquistaDoUsuario) => {
+    const situacao = c.desbloqueada
+      ? `Desbloqueada${c.dataDesbloqueio ? ` em ${new Date(c.dataDesbloqueio).toLocaleDateString('pt-BR')}` : ''}.`
+      : `Bloqueada: alcance ${c.pontosNecessarios} pontos para desbloquear.`;
+    Alert.alert(c.titulo, [c.descricao, situacao].filter(Boolean).join('\n\n'));
+  };
 
   const alternarTelemetria = (ligar: boolean) => {
     if (ligar) {
@@ -77,7 +145,7 @@ export function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={HOME_COLORS.background} />
+      <StatusBar barStyle={barraStatus} backgroundColor={cores.background} />
 
       <ScrollView
         style={styles.scroll}
@@ -86,9 +154,23 @@ export function ProfileScreen() {
       >
         {/* Header Perfil */}
         <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
-          <View style={styles.avatarGrande}>
-            <Text style={styles.avatarTexto}>{user.iniciais}</Text>
-          </View>
+          <TouchableOpacity
+            onPress={abrirOpcoesFoto}
+            disabled={enviandoFoto}
+            activeOpacity={0.8}
+            style={styles.avatarGrande}
+            accessibilityRole="button"
+            accessibilityLabel="Alterar foto de perfil"
+          >
+            <Avatar nome={user.nome} fotoUrl={usuario?.fotoUrl} tamanho={96} />
+            <View style={styles.avatarBadge}>
+              {enviandoFoto ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={14} color="#FFFFFF" />
+              )}
+            </View>
+          </TouchableOpacity>
           <Text style={styles.nome}>{user.nome}</Text>
           <Text style={styles.titulo}>{nivel.titulo} · Nível {nivel.nivel}</Text>
           <Text style={styles.email}>{usuario?.email}</Text>
@@ -110,11 +192,11 @@ export function ProfileScreen() {
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
             <Text style={styles.statValor}>{coletados.size}</Text>
-            <Text style={styles.statLabel}>Locais Visitados</Text>
+            <Text style={styles.statLabel}>Locais visitados</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statValor}>4</Text>
+            <Text style={styles.statValor}>{desbloqueadas}</Text>
             <Text style={styles.statLabel}>Conquistas</Text>
           </View>
         </View>
@@ -122,20 +204,47 @@ export function ProfileScreen() {
         {/* SEÇÃO CONQUISTAS */}
         <Text style={styles.secaoTitulo}>Conquistas</Text>
 
-        <View style={styles.conquistasGrid}>
-          {CONQUISTAS_MOCK.map((c) => (
-            <View key={c.id} style={styles.conquistaCard}>
-              <Text style={styles.conquistaIcone}>{c.icone}</Text>
-              <Text style={styles.conquistaTitulo}>{c.titulo}</Text>
-              <Text style={styles.conquistaDesc}>{c.desc}</Text>
-            </View>
-          ))}
+        <View style={styles.conquistasLista}>
+          <View style={styles.conquistasGrade}>
+            {conquistas.map((c, i) => (
+              <SeloConquista key={c.id} conquista={c} posicao={i} onPress={() => mostrarConquista(c)} />
+            ))}
+          </View>
+          {conquistas.length === 0 && (
+            <Text style={[styles.conquistaDesc, { padding: 16 }]}>Carregando conquistas...</Text>
+          )}
         </View>
 
         {/* OPÇÕES */}
         <View style={styles.opcoesContainer}>
+          <View style={styles.opcaoItem}>
+            <View style={styles.opcaoLinha}>
+              <Ionicons name="contrast-outline" size={20} color={cores.discoverBlue} style={styles.opcaoIcone} />
+              <View style={styles.opcaoTextos}>
+                <Text style={styles.opcaoTexto}>Aparência</Text>
+                <Text style={styles.opcaoDescricao}>Tema claro, escuro ou o mesmo do sistema</Text>
+              </View>
+            </View>
+            <View style={styles.temaLinha} accessibilityRole="radiogroup">
+              {TEMAS.map((t) => {
+                const ativo = preferencia === t.id;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[styles.temaOpcao, ativo && styles.temaOpcaoAtiva]}
+                    onPress={() => definirPreferencia(t.id)}
+                    activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: ativo }}
+                  >
+                    <Text style={[styles.temaTexto, ativo && styles.temaTextoAtivo]}>{t.rotulo}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
           <View style={[styles.opcaoItem, styles.opcaoLinha]}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={HOME_COLORS.discoverBlue} style={styles.opcaoIcone} />
+            <Ionicons name="shield-checkmark-outline" size={20} color={cores.discoverBlue} style={styles.opcaoIcone} />
             <View style={styles.opcaoTextos}>
               <Text style={styles.opcaoTexto}>Compartilhar telemetria</Text>
               <Text style={styles.opcaoDescricao}>
@@ -145,7 +254,7 @@ export function ProfileScreen() {
             <Switch
               value={consentimento === true}
               onValueChange={alternarTelemetria}
-              trackColor={{ true: HOME_COLORS.discoverBlue, false: HOME_COLORS.cardBorder }}
+              trackColor={{ true: cores.discoverBlue, false: cores.cardBorder }}
               thumbColor="#FFFFFF"
               accessibilityLabel="Compartilhar telemetria para a pesquisa do TCC"
             />
@@ -167,10 +276,10 @@ export function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   scroll: {
     flex: 1,
@@ -184,50 +293,77 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   avatarGrande: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: HOME_COLORS.accent,
+    marginBottom: 12,
+  },
+  avatarBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: cores.accent,
+    borderWidth: 2,
+    borderColor: cores.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 3,
-    borderColor: HOME_COLORS.accentLight,
   },
-  avatarTexto: {
-    color: '#FFFFFF',
-    fontSize: 32,
+  temaLinha: {
+    flexDirection: 'row',
+    marginTop: 10,
+    backgroundColor: cores.background,
+    borderRadius: 10,
+    padding: 3,
+  },
+  temaOpcao: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  temaOpcaoAtiva: {
+    backgroundColor: cores.card,
+    borderWidth: 1,
+    borderColor: cores.cardBorder,
+  },
+  temaTexto: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: cores.textSecondary,
+  },
+  temaTextoAtivo: {
+    color: cores.textPrimary,
     fontWeight: '800',
   },
   nome: {
     fontSize: 24,
     fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
   titulo: {
     fontSize: 14,
     fontWeight: '700',
-    color: HOME_COLORS.discoverBlue,
+    color: cores.textSecondary,
     marginTop: 4,
   },
   email: {
     fontSize: 13,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     marginTop: 2,
   },
   placarDesafios: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#F97316',
+    color: cores.textSecondary,
     marginTop: 8,
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: HOME_COLORS.card,
-    borderRadius: 18,
+    backgroundColor: cores.card,
+    borderRadius: 14,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     marginBottom: 24,
     alignItems: 'center',
   },
@@ -238,70 +374,62 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 28,
-    backgroundColor: HOME_COLORS.cardBorder,
+    backgroundColor: cores.cardBorder,
   },
   statValor: {
     fontSize: 18,
     fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
   statLabel: {
     fontSize: 11,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     marginTop: 2,
     fontWeight: '500',
   },
   secaoTitulo: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
     marginBottom: 14,
   },
-  conquistasGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  conquistasLista: {
+    backgroundColor: cores.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: cores.cardBorder,
+    overflow: 'hidden',
     marginBottom: 24,
   },
-  conquistaCard: {
-    width: '48%',
-    backgroundColor: HOME_COLORS.card,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
-  },
-  conquistaIcone: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  conquistaTitulo: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: HOME_COLORS.textPrimary,
+  conquistasGrade: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
   },
   conquistaDesc: {
-    fontSize: 11,
-    color: HOME_COLORS.textSecondary,
+    fontSize: 12,
+    color: cores.textSecondary,
     marginTop: 2,
   },
+
   opcoesContainer: {
-    backgroundColor: HOME_COLORS.card,
-    borderRadius: 18,
+    backgroundColor: cores.card,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     overflow: 'hidden',
   },
   opcaoItem: {
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: HOME_COLORS.cardBorder,
+    borderBottomColor: cores.cardBorder,
   },
   opcaoTexto: {
     fontSize: 14,
     fontWeight: '600',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
   opcaoLinha: {
     flexDirection: 'row',
@@ -316,7 +444,7 @@ const styles = StyleSheet.create({
   },
   opcaoDescricao: {
     fontSize: 12,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     marginTop: 2,
   },
 });

@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -40,6 +40,13 @@
           "locationWhenInUsePermission": "O UVV Go usa sua localização para mostrar sua posição no mapa do campus e liberar a coleta dos cristais nos pontos."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O UVV Go acessa suas fotos para você escolher a foto do seu perfil.",
+          "microphonePermission": false
+        }
+      ],
       "expo-dev-client",
       [
         "@reactvision/react-viro",
@@ -52,6 +59,11 @@
         }
       ]
     ],
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "53c99753-999a-4eec-b40e-944353611604"
+      }
+    }
   }
 }

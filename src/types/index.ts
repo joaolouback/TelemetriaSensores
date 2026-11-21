@@ -55,6 +55,8 @@ export interface Usuario {
   nome: string;
   email: string;
   pontuacaoTotal: number;
+  /** Foto de perfil, relativa ao servidor (ex.: `/avatares/3-1730000000000.jpg`). */
+  fotoUrl?: string | null;
   dataCadastro: string;
 }
 
@@ -101,6 +103,43 @@ export interface Conquista {
   descricao: string | null;
   iconeUrl: string | null;
   pontosNecessarios: number;
+}
+
+/** Conquista com o estado do usuário logado (`GET /api/conquistas`). */
+export interface ConquistaDoUsuario extends Conquista {
+  desbloqueada: boolean;
+  dataDesbloqueio: string | null;
+}
+
+export interface JogadorRanking {
+  posicao: number;
+  id: number;
+  /** Primeiro nome e inicial do sobrenome (ex.: "João L."). */
+  nome: string;
+  pontuacaoTotal: number;
+  fotoUrl: string | null;
+}
+
+/** Resposta de `GET /api/ranking`. */
+export interface Ranking {
+  total: number;
+  jogadores: JogadorRanking[];
+  /** O usuário logado, mesmo fora da lista. */
+  eu: JogadorRanking;
+}
+
+/** Perfil público de um jogador (`GET /api/jogadores/:id`), aberto a partir do ranking. */
+export interface PerfilJogador {
+  id: number;
+  nome: string;
+  fotoUrl: string | null;
+  pontuacaoTotal: number;
+  posicao: number;
+  membroDesde: string;
+  locaisColetados: number;
+  desafios: PlacarDesafios;
+  conquistas: ConquistaDoUsuario[];
+  ehVoce: boolean;
 }
 
 /** Resposta do check-in (`POST /api/interacoes`) quando o objeto é coletado. */

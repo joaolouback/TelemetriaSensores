@@ -1,137 +1,279 @@
 /**
- * Tela de Ranking / Leaderboard — UVV Go
+ * Tela de Ranking — UVV Go
+ *
+ * Classificação geral dos jogadores, calculada pela API a partir da pontuação real.
+ * Mostra a posição do usuário logado mesmo quando ele está fora da lista.
  */
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   StatusBar,
+  RefreshControl,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
-import { HOME_COLORS } from '../constants';
+import { Ionicons } from '@expo/vector-icons';
+import { Avatar } from '../components/Avatar';
+import { PerfilJogadorSheet } from '../components/PerfilJogadorSheet';
+import { useTema, useEstilos } from '../contexts/TemaContext';
+import type { Tema } from '../constants/temas';
+import { useAuth } from '../contexts/AuthContext';
+import { buscarRanking } from '../services/ranking';
+import { JogadorRanking, Ranking } from '../types';
+import { calcularNivel } from '../utils/nivel';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const RANKING_MOCK = [
-  { posicao: 1, nome: 'Lucas Silva', xp: 8450, nivel: 9, avatar: 'LS', destaque: false },
-  { posicao: 2, nome: 'Mariana Costa', xp: 7200, nivel: 8, avatar: 'MC', destaque: false },
-  { posicao: 3, nome: 'Pedro Henrique', xp: 6100, nivel: 7, avatar: 'PH', destaque: false },
-  { posicao: 4, nome: 'Arthur (Você)', xp: 4200, nivel: 5, avatar: 'AR', destaque: true },
-  { posicao: 5, nome: 'Beatriz Lima', xp: 3950, nivel: 5, avatar: 'BL', destaque: false },
-  { posicao: 6, nome: 'Gabriel Rocha', xp: 3100, nivel: 4, avatar: 'GR', destaque: false },
-  { posicao: 7, nome: 'Camila Santos', xp: 2800, nivel: 4, avatar: 'CS', destaque: false },
-  { posicao: 8, nome: 'Rafael Oliveira', xp: 2300, nivel: 3, avatar: 'RO', destaque: false },
-];
+/** Cores dos degraus do pódio: ouro, prata e bronze, em tons discretos. */
+const COR_PODIO = { 1: '#C9A227', 2: '#9AA3B2', 3: '#B87333' } as const;
+const ALTURA_DEGRAU = { 1: 110, 2: 80, 3: 58 } as const;
+const TAMANHO_AVATAR = { 1: 72, 2: 58, 3: 58 } as const;
+
+function Podio({
+  jogadores,
+  euId,
+  onAbrir,
+}: {
+  jogadores: JogadorRanking[];
+  euId: number;
+  onAbrir: (id: number) => void;
+}) {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
+  // Ordem visual: 2º, 1º, 3º — o campeão no meio.
+  const ordem = [2, 1, 3] as const;
+
+  return (
+    <View style={styles.podio} accessibilityLabel="Pódio dos três primeiros colocados">
+      {ordem.map((posicao) => {
+        const jogador = jogadores.find((j) => j.posicao === posicao);
+        const cor = COR_PODIO[posicao];
+        const souEu = jogador?.id === euId;
+
+        return (
+          <TouchableOpacity
+            key={posicao}
+            style={styles.podioColuna}
+            activeOpacity={0.8}
+            disabled={!jogador}
+            onPress={() => jogador && onAbrir(jogador.id)}
+            accessibilityRole="button"
+            accessibilityLabel={jogador ? `${posicao}º lugar, ${jogador.nome}. Toque para ver o perfil` : `${posicao}º lugar vago`}
+          >
+            {posicao === 1 && jogador && (
+              <Ionicons name="trophy" size={20} color={cor} style={styles.podioTrofeu} />
+            )}
+
+            {jogador ? (
+              <View style={[styles.podioFoto, { borderColor: cor }]}>
+                <Avatar
+                  nome={jogador.nome}
+                  fotoUrl={jogador.fotoUrl}
+                  tamanho={TAMANHO_AVATAR[posicao]}
+                  cor={cores.textMuted}
+                />
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.podioFoto,
+                  styles.podioVazio,
+                  { width: TAMANHO_AVATAR[posicao] + 6, height: TAMANHO_AVATAR[posicao] + 6 },
+                ]}
+              />
+            )}
+
+            <Text style={[styles.podioNome, souEu && styles.nomeDestaque]} numberOfLines={1}>
+              {jogador ? jogador.nome : 'Vaga aberta'}
+            </Text>
+            <Text style={styles.podioPontos}>
+              {jogador ? `${jogador.pontuacaoTotal.toLocaleString('pt-BR')} pts` : '—'}
+            </Text>
+
+            <View style={[styles.degrau, { height: ALTURA_DEGRAU[posicao], backgroundColor: cor }]}>
+              <Text style={styles.degrauNumero}>{posicao}</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function Linha({ jogador, souEu, onAbrir }: { jogador: JogadorRanking; souEu: boolean; onAbrir: (id: number) => void }) {
+  const styles = useEstilos(criarEstilos);
+  const nivel = calcularNivel(jogador.pontuacaoTotal);
+
+  return (
+    <TouchableOpacity
+      style={[styles.linha, souEu && styles.linhaDestaque]}
+      activeOpacity={0.7}
+      onPress={() => onAbrir(jogador.id)}
+      accessibilityRole="button"
+      accessibilityLabel={`${jogador.posicao}º lugar, ${jogador.nome}, ${jogador.pontuacaoTotal} pontos${souEu ? ', você' : ''}. Toque para ver o perfil`}
+    >
+      <Text style={styles.posicaoTexto}>{jogador.posicao}</Text>
+
+      <View style={styles.avatar}>
+        <Avatar nome={jogador.nome} fotoUrl={jogador.fotoUrl} tamanho={36} />
+      </View>
+
+      <View style={styles.info}>
+        <Text style={[styles.nome, souEu && styles.nomeDestaque]} numberOfLines={1}>
+          {jogador.nome}
+          {souEu ? ' (você)' : ''}
+        </Text>
+        <Text style={styles.nivel}>
+          Nível {nivel.nivel} · {nivel.titulo}
+        </Text>
+      </View>
+
+      <Text style={[styles.pontos, souEu && styles.nomeDestaque]}>
+        {jogador.pontuacaoTotal.toLocaleString('pt-BR')}
+        <Text style={styles.pontosSufixo}> pts</Text>
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export function RankingScreen() {
   const insets = useSafeAreaInsets();
-  const top3 = RANKING_MOCK.slice(0, 3);
-  const resto = RANKING_MOCK.slice(3);
+  const styles = useEstilos(criarEstilos);
+  const { cores, barraStatus } = useTema();
+  const { usuario } = useAuth();
+  const [ranking, setRanking] = useState<Ranking | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [jogadorAberto, setJogadorAberto] = useState<number | null>(null);
+
+  const carregar = useCallback(async () => {
+    try {
+      setRanking(await buscarRanking());
+      setErro(null);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível carregar o ranking.');
+    } finally {
+      setCarregando(false);
+      setAtualizando(false);
+    }
+  }, []);
+
+  // A pontuação muda a cada coleta: recarregar com ela mantém o ranking em dia.
+  const usuarioId = usuario?.id;
+  const pontuacao = usuario?.pontuacaoTotal;
+  useEffect(() => {
+    if (!usuarioId) return;
+    carregar();
+    // `pontuacao` não é lida aqui: é o gatilho que dispara a recarga após uma coleta.
+  }, [usuarioId, pontuacao, carregar]);
+
+  const aoPuxar = () => {
+    setAtualizando(true);
+    carregar();
+  };
+
+  const euForaDaLista = ranking && !ranking.jogadores.some((j) => j.id === ranking.eu.id);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={HOME_COLORS.background} />
+      <StatusBar barStyle={barraStatus} backgroundColor={cores.background} />
 
       <View style={[styles.header, { paddingTop: insets.top + 32 }]}>
-        <Text style={styles.headerTitulo}>Ranking do Campus 🏆</Text>
-        <Text style={styles.headerSubtitulo}>Os maiores exploradores da UVV</Text>
+        <Text style={styles.headerTitulo}>Ranking</Text>
+        <Text style={styles.headerSubtitulo}>Classificação geral dos jogadores</Text>
       </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={atualizando} onRefresh={aoPuxar} />}
       >
-        {/* Podium Top 3 */}
-        <View style={styles.podiumContainer}>
-          {/* #2 */}
-          <View style={[styles.podiumItem, styles.podium2]}>
-            <View style={styles.avatar2}>
-              <Text style={styles.avatarTexto}>{top3[1].avatar}</Text>
-            </View>
-            <Text style={styles.podiumPosicao}>2º</Text>
-            <Text style={styles.podiumNome} numberOfLines={1}>{top3[1].nome}</Text>
-            <Text style={styles.podiumXp}>{top3[1].xp} XP</Text>
+        {carregando && !ranking && (
+          <ActivityIndicator style={styles.estado} color={cores.discoverBlue} />
+        )}
+
+        {erro && (
+          <View style={styles.estado}>
+            <Text style={styles.estadoTexto}>{erro}</Text>
+            <TouchableOpacity style={styles.botao} onPress={aoPuxar} accessibilityRole="button">
+              <Text style={styles.botaoTexto}>Tentar de novo</Text>
+            </TouchableOpacity>
           </View>
+        )}
 
-          {/* #1 */}
-          <View style={[styles.podiumItem, styles.podium1]}>
-            <Text style={styles.coroa}>👑</Text>
-            <View style={styles.avatar1}>
-              <Text style={styles.avatarTexto}>{top3[0].avatar}</Text>
-            </View>
-            <Text style={styles.podiumPosicao1}>1º</Text>
-            <Text style={styles.podiumNome1} numberOfLines={1}>{top3[0].nome}</Text>
-            <Text style={styles.podiumXp1}>{top3[0].xp} XP</Text>
-          </View>
-
-          {/* #3 */}
-          <View style={[styles.podiumItem, styles.podium3]}>
-            <View style={styles.avatar3}>
-              <Text style={styles.avatarTexto}>{top3[2].avatar}</Text>
-            </View>
-            <Text style={styles.podiumPosicao}>3º</Text>
-            <Text style={styles.podiumNome} numberOfLines={1}>{top3[2].nome}</Text>
-            <Text style={styles.podiumXp}>{top3[2].xp} XP</Text>
-          </View>
-        </View>
-
-        {/* Lista do restante */}
-        <View style={styles.listaCard}>
-          {resto.map((user) => (
-            <View
-              key={user.posicao}
-              style={[
-                styles.itemLinha,
-                user.destaque && styles.itemDestaque,
-              ]}
-            >
-              <Text style={[styles.posicaoTexto, user.destaque && styles.posicaoDestaque]}>
-                #{user.posicao}
-              </Text>
-
-              <View style={[styles.miniAvatar, user.destaque && styles.miniAvatarDestaque]}>
-                <Text style={styles.miniAvatarTexto}>{user.avatar}</Text>
+        {ranking && (
+          <>
+            <View style={styles.resumo}>
+              <View style={styles.resumoItem}>
+                <Text style={styles.resumoValor}>{ranking.eu.posicao}º</Text>
+                <Text style={styles.resumoRotulo}>Sua posição</Text>
               </View>
-
-              <View style={styles.itemInfo}>
-                <Text style={[styles.itemNome, user.destaque && styles.itemNomeDestaque]}>
-                  {user.nome}
+              <View style={styles.resumoDivisor} />
+              <View style={styles.resumoItem}>
+                <Text style={styles.resumoValor}>
+                  {ranking.eu.pontuacaoTotal.toLocaleString('pt-BR')}
                 </Text>
-                <Text style={styles.itemNivel}>Nível {user.nivel}</Text>
+                <Text style={styles.resumoRotulo}>Seus pontos</Text>
               </View>
-
-              <Text style={[styles.itemXp, user.destaque && styles.itemXpDestaque]}>
-                {user.xp.toLocaleString('pt-BR')} XP
-              </Text>
+              <View style={styles.resumoDivisor} />
+              <View style={styles.resumoItem}>
+                <Text style={styles.resumoValor}>{ranking.total}</Text>
+                <Text style={styles.resumoRotulo}>
+                  {ranking.total === 1 ? 'Jogador' : 'Jogadores'}
+                </Text>
+              </View>
             </View>
-          ))}
-        </View>
+
+            <Podio jogadores={ranking.jogadores} euId={ranking.eu.id} onAbrir={setJogadorAberto} />
+
+            <View style={styles.lista}>
+              {ranking.jogadores.slice(3).map((jogador) => (
+                <Linha
+                  key={jogador.id}
+                  jogador={jogador}
+                  souEu={jogador.id === ranking.eu.id}
+                  onAbrir={setJogadorAberto}
+                />
+              ))}
+              {euForaDaLista && (
+                <>
+                  <Text style={styles.reticencias}>···</Text>
+                  <Linha jogador={ranking.eu} souEu onAbrir={setJogadorAberto} />
+                </>
+              )}
+            </View>
+          </>
+        )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      <PerfilJogadorSheet jogadorId={jogadorAberto} onFechar={() => setJogadorAberto(null)} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores: Tema) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HOME_COLORS.background,
+    backgroundColor: cores.background,
   },
   header: {
     paddingBottom: 16,
     paddingHorizontal: 20,
-    backgroundColor: HOME_COLORS.background,
   },
   headerTitulo: {
     fontSize: 26,
     fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
   headerSubtitulo: {
     fontSize: 14,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
     marginTop: 4,
   },
   scroll: {
@@ -141,169 +283,161 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
-  podiumContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    marginVertical: 20,
+
+  estado: {
+    marginTop: 40,
+    alignItems: 'center',
     gap: 12,
   },
-  podiumItem: {
+  estadoTexto: {
+    color: cores.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  botao: {
+    backgroundColor: cores.accent,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  botaoTexto: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  resumo: {
+    flexDirection: 'row',
+    backgroundColor: cores.accent,
+    borderRadius: 14,
+    paddingVertical: 18,
+    marginBottom: 16,
+  },
+  resumoItem: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: HOME_COLORS.card,
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
   },
-  podium1: {
-    borderColor: HOME_COLORS.xpGold,
-    backgroundColor: '#FFFDF5',
-    elevation: 4,
-    paddingVertical: 18,
-  },
-  podium2: {
-    borderColor: '#CBD5E1',
-  },
-  podium3: {
-    borderColor: '#FDBA74',
-  },
-  coroa: {
+  resumoValor: {
+    color: '#FFFFFF',
     fontSize: 22,
+    fontWeight: '800',
+  },
+  resumoRotulo: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  resumoDivisor: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+
+  podio: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    marginBottom: 16,
+  },
+  podioColuna: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  podioTrofeu: {
     marginBottom: 4,
   },
-  avatar1: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: HOME_COLORS.xpGold,
-    alignItems: 'center',
-    justifyContent: 'center',
+  podioFoto: {
+    borderRadius: 999,
+    borderWidth: 3,
     marginBottom: 8,
   },
-  avatar2: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#94A3B8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+  podioVazio: {
+    borderStyle: 'dashed',
+    borderColor: cores.cardBorder,
   },
-  avatar3: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EA580C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  avatarTexto: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  podiumPosicao1: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: HOME_COLORS.xpGold,
-  },
-  podiumPosicao: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: HOME_COLORS.textSecondary,
-  },
-  podiumNome1: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: HOME_COLORS.textPrimary,
-    marginTop: 2,
-  },
-  podiumNome: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: HOME_COLORS.textPrimary,
-    marginTop: 2,
-  },
-  podiumXp1: {
+  podioNome: {
     fontSize: 13,
     fontWeight: '800',
-    color: HOME_COLORS.xpGold,
-    marginTop: 4,
+    color: cores.textPrimary,
+    maxWidth: '100%',
   },
-  podiumXp: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: HOME_COLORS.textSecondary,
-    marginTop: 4,
+  podioPontos: {
+    fontSize: 12,
+    color: cores.textSecondary,
+    marginTop: 2,
+    marginBottom: 8,
   },
-  listaCard: {
-    backgroundColor: HOME_COLORS.card,
-    borderRadius: 18,
+  degrau: {
+    alignSelf: 'stretch',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 8,
+  },
+  degrauNumero: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
+  },
+
+  lista: {
+    backgroundColor: cores.card,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: HOME_COLORS.cardBorder,
+    borderColor: cores.cardBorder,
     overflow: 'hidden',
   },
-  itemLinha: {
+  linha: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: HOME_COLORS.cardBorder,
+    borderBottomColor: cores.cardBorder,
   },
-  itemDestaque: {
-    backgroundColor: '#EEF2FF',
+  linhaDestaque: {
+    backgroundColor: cores.missionIconBg,
   },
   posicaoTexto: {
+    width: 26,
     fontSize: 14,
     fontWeight: '700',
-    color: HOME_COLORS.textMuted,
-    width: 32,
+    color: cores.textMuted,
   },
-  posicaoDestaque: {
-    color: HOME_COLORS.discoverBlue,
-  },
-  miniAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: HOME_COLORS.accentLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+  avatar: {
     marginRight: 12,
   },
-  miniAvatarDestaque: {
-    backgroundColor: HOME_COLORS.discoverBlue,
-  },
-  miniAvatarTexto: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  itemInfo: {
+  info: {
     flex: 1,
+    marginRight: 8,
   },
-  itemNome: {
+  nome: {
     fontSize: 14,
     fontWeight: '700',
-    color: HOME_COLORS.textPrimary,
+    color: cores.textPrimary,
   },
-  itemNomeDestaque: {
-    color: HOME_COLORS.discoverBlue,
+  nomeDestaque: {
+    color: cores.accent,
   },
-  itemNivel: {
+  nivel: {
     fontSize: 12,
-    color: HOME_COLORS.textSecondary,
+    color: cores.textSecondary,
+    marginTop: 1,
   },
-  itemXp: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: HOME_COLORS.textPrimary,
+  pontos: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: cores.textPrimary,
   },
-  itemXpDestaque: {
-    color: HOME_COLORS.discoverBlue,
+  pontosSufixo: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: cores.textSecondary,
+  },
+  reticencias: {
+    textAlign: 'center',
+    color: cores.textMuted,
+    paddingVertical: 4,
+    letterSpacing: 4,
   },
 });
