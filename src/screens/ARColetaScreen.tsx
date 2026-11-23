@@ -26,6 +26,7 @@ import {
   ViroNode,
   Viro3DObject,
   ViroSphere,
+  ViroImage,
   ViroMaterials,
   ViroAmbientLight,
   ViroDirectionalLight,
@@ -84,6 +85,8 @@ type Fase =
 /** Dados que a cena 3D recebe do componente React (via `viroAppProps`). */
 interface PropsCena {
   modeloUrl: string;
+  /** Foto circular do local, desenhada dentro do anel (vazia se o modelo não for um anel). */
+  fotoUrl: string | null;
   formato: 'GLB' | 'GLTF' | 'OBJ' | 'VRX';
   escala: number;
   flutuante: boolean;
@@ -94,6 +97,10 @@ interface PropsCena {
   onToque: () => void;
 }
 
+/** Raio e centro (altura) da foto no modelo do anel (scripts/gerar-modelo-3d.ts), em unidades do GLB. */
+const FOTO_RAIO_MODELO = 0.48;
+const FOTO_CENTRO_Y_MODELO = -0.15;
+
 function Objeto({ cena }: { cena: PropsCena }) {
   const { escala } = cena;
   const [falhou, setFalhou] = useState(false);
@@ -102,32 +109,54 @@ function Objeto({ cena }: { cena: PropsCena }) {
     : { name: 'girar', run: true, loop: true };
   const aoTocar = cena.coletado ? undefined : cena.onToque;
 
+  const lado = 2 * FOTO_RAIO_MODELO * escala;
+  const centroY = FOTO_CENTRO_Y_MODELO * escala;
+
   return (
     <ViroNode animation={{ name: 'flutuar', run: !cena.coletado, loop: true }}>
-      {falhou ? (
-        // Sem o GLB, uma esfera simples permite testar a coleta mesmo assim.
-        <ViroSphere
-          radius={0.1}
-          materials={['cristalReserva']}
-          animation={animacao}
-          onClick={aoTocar}
-        />
-      ) : (
-        <Viro3DObject
-          source={{ uri: cena.modeloUrl }}
-          type={cena.formato}
-          scale={[escala, escala, escala]}
-          animation={animacao}
-          onClick={aoTocar}
-          onLoadStart={() => cena.onModelo('carregando')}
-          onLoadEnd={() => cena.onModelo('ok')}
-          onError={(e) => {
-            console.warn('[AR] Falha ao carregar o modelo 3D:', cena.modeloUrl, e.nativeEvent);
-            setFalhou(true);
-            cena.onModelo('erro');
-          }}
-        />
-      )}
+      <ViroNode animation={animacao}>
+        {falhou && !cena.fotoUrl ? (
+          // Sem o GLB (e sem foto), uma esfera simples permite testar a coleta mesmo assim.
+          <ViroSphere radius={0.1} materials={['cristalReserva']} onClick={aoTocar} />
+        ) : (
+          <>
+            {!falhou && (
+              <Viro3DObject
+                source={{ uri: cena.modeloUrl }}
+                type={cena.formato}
+                scale={[escala, escala, escala]}
+                onClick={aoTocar}
+                onLoadStart={() => cena.onModelo('carregando')}
+                onLoadEnd={() => cena.onModelo('ok')}
+                onError={(e) => {
+                  console.warn('[AR] Falha ao carregar o modelo 3D:', cena.modeloUrl, e.nativeEvent);
+                  setFalhou(true);
+                  cena.onModelo('erro');
+                }}
+              />
+            )}
+            {cena.fotoUrl && (
+              <>
+                <ViroImage
+                  source={{ uri: cena.fotoUrl }}
+                  width={lado}
+                  height={lado}
+                  position={[0, centroY, 0.003]}
+                  onClick={aoTocar}
+                />
+                <ViroImage
+                  source={{ uri: cena.fotoUrl }}
+                  width={lado}
+                  height={lado}
+                  position={[0, centroY, -0.003]}
+                  rotation={[0, 180, 0]}
+                  onClick={aoTocar}
+                />
+              </>
+            )}
+          </>
+        )}
+      </ViroNode>
     </ViroNode>
   );
 }
@@ -195,8 +224,11 @@ function resolverModelo(ponto: PontoComDistancia) {
   const objeto = ponto.objeto3d;
   const url = objeto?.assetUrl || MODELO_PADRAO;
   const formato = (objeto?.formato?.toUpperCase() ?? 'GLB') as PropsCena['formato'];
+  // Os anéis têm a foto do local em `anel-<slug>.png`, ao lado do GLB.
+  const fotoUrl = /\/anel-[\w-]+\.glb$/.test(url) ? urlDoServidor(url.replace(/\.glb$/, '.png')) : null;
   return {
     modeloUrl: urlDoServidor(url),
+    fotoUrl,
     formato: ['GLB', 'GLTF', 'OBJ', 'VRX'].includes(formato) ? formato : 'GLB',
     escala: objeto?.escala ?? ESCALA_PADRAO,
   };

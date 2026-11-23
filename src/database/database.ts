@@ -292,3 +292,29 @@ export async function salvarPreferenciaTema(preferencia: PreferenciaTema): Promi
     [CHAVE_TEMA, preferencia]
   );
 }
+
+// ─── Tema comprado na loja ───────────────────────────────────────────
+// Guardado no aparelho para o tema valer já na abertura, antes de a loja responder.
+
+const CHAVE_TEMA_LOJA = 'tema_loja';
+
+export async function getTemaLoja(): Promise<string | null> {
+  const database = await initDatabase();
+  const row = await database.getFirstAsync<{ valor: string }>(
+    `SELECT valor FROM ${SESSION_TABLE_NAME} WHERE chave = ?`,
+    [CHAVE_TEMA_LOJA]
+  );
+  return row?.valor || null;
+}
+
+export async function salvarTemaLoja(codigo: string | null): Promise<void> {
+  const database = await initDatabase();
+  if (codigo) {
+    await database.runAsync(
+      `INSERT OR REPLACE INTO ${SESSION_TABLE_NAME} (chave, valor) VALUES (?, ?)`,
+      [CHAVE_TEMA_LOJA, codigo]
+    );
+  } else {
+    await database.runAsync(`DELETE FROM ${SESSION_TABLE_NAME} WHERE chave = ?`, [CHAVE_TEMA_LOJA]);
+  }
+}

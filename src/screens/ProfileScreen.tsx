@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTelemetria } from '../contexts/TelemetriaContext';
+import { useLoja } from '../contexts/LojaContext';
 import { Avatar } from '../components/Avatar';
 import { SeloConquista } from '../components/SeloConquista';
 import { enviarFotoPerfil, removerFotoPerfil } from '../services/foto';
@@ -40,7 +41,19 @@ export function ProfileScreen() {
   const { cores, barraStatus } = useTema();
   const insets = useSafeAreaInsets();
   const { usuario, sair, atualizarUsuario } = useAuth();
-  const { preferencia, definirPreferencia } = useTema();
+  const { preferencia, definirPreferencia, temaLoja } = useTema();
+  const { moldura, titulo, loja, equipar } = useLoja();
+  const nomeTemaLoja = temaLoja ? loja?.itens.find((i) => i.codigo === temaLoja)?.nome : undefined;
+
+  // Escolher claro/escuro/sistema tira o tema da loja, que tem prioridade sobre eles.
+  const escolherAparencia = (nova: PreferenciaTema) => {
+    definirPreferencia(nova);
+    if (temaLoja) {
+      equipar('TEMA', null).catch((e) =>
+        Alert.alert('Não foi possível trocar o tema', e instanceof Error ? e.message : 'Tente novamente.')
+      );
+    }
+  };
   const { consentimento, definirConsentimento } = useTelemetria();
   const { coletados } = useColetas();
   const pontuacao = usuario?.pontuacaoTotal ?? 0;
@@ -162,7 +175,7 @@ export function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Alterar foto de perfil"
           >
-            <Avatar nome={user.nome} fotoUrl={usuario?.fotoUrl} tamanho={96} />
+            <Avatar nome={user.nome} fotoUrl={usuario?.fotoUrl} tamanho={96} moldura={moldura} />
             <View style={styles.avatarBadge}>
               {enviandoFoto ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -172,6 +185,12 @@ export function ProfileScreen() {
             </View>
           </TouchableOpacity>
           <Text style={styles.nome}>{user.nome}</Text>
+          {titulo && (
+            <View style={styles.seloTitulo}>
+              <Ionicons name="ribbon" size={13} color={cores.xpGold} />
+              <Text style={styles.seloTituloTexto}>{titulo}</Text>
+            </View>
+          )}
           <Text style={styles.titulo}>{nivel.titulo} · Nível {nivel.nivel}</Text>
           <Text style={styles.email}>{usuario?.email}</Text>
           {placar && placar.vitorias + placar.derrotas + placar.empates > 0 && (
@@ -222,17 +241,21 @@ export function ProfileScreen() {
               <Ionicons name="contrast-outline" size={20} color={cores.discoverBlue} style={styles.opcaoIcone} />
               <View style={styles.opcaoTextos}>
                 <Text style={styles.opcaoTexto}>Aparência</Text>
-                <Text style={styles.opcaoDescricao}>Tema claro, escuro ou o mesmo do sistema</Text>
+                <Text style={styles.opcaoDescricao}>
+                  {nomeTemaLoja
+                    ? `Usando o tema ${nomeTemaLoja}, da loja`
+                    : 'Tema claro, escuro ou o mesmo do sistema'}
+                </Text>
               </View>
             </View>
             <View style={styles.temaLinha} accessibilityRole="radiogroup">
               {TEMAS.map((t) => {
-                const ativo = preferencia === t.id;
+                const ativo = !temaLoja && preferencia === t.id;
                 return (
                   <TouchableOpacity
                     key={t.id}
                     style={[styles.temaOpcao, ativo && styles.temaOpcaoAtiva]}
-                    onPress={() => definirPreferencia(t.id)}
+                    onPress={() => escolherAparencia(t.id)}
                     activeOpacity={0.8}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: ativo }}
@@ -334,6 +357,22 @@ const criarEstilos = (cores: Tema) => StyleSheet.create({
   temaTextoAtivo: {
     color: cores.textPrimary,
     fontWeight: '800',
+  },
+  seloTitulo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: cores.xpGold,
+  },
+  seloTituloTexto: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: cores.textPrimary,
   },
   nome: {
     fontSize: 24,

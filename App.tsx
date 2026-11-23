@@ -7,6 +7,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { RegistroScreen } from './src/screens/RegistroScreen';
 import { ConsentimentoScreen } from './src/screens/ConsentimentoScreen';
 import { DesafioProvider } from './src/contexts/DesafioContext';
+import { LojaProvider } from './src/contexts/LojaContext';
 import { TemaProvider, useTema } from './src/contexts/TemaContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErroBoundary } from './src/components/ErroBoundary';
@@ -44,7 +45,9 @@ function Conteudo() {
 
   return (
     <DesafioProvider>
-      <BottomTabs />
+      <LojaProvider>
+        <BottomTabs />
+      </LojaProvider>
     </DesafioProvider>
   );
 }

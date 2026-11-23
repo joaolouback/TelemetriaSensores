@@ -51,11 +51,12 @@ export function PerfilJogadorSheet({ jogadorId, onFechar }: Props) {
       {perfil && nivel && (
         <>
           <View style={styles.topo}>
-            <Avatar nome={perfil.nome} fotoUrl={perfil.fotoUrl} tamanho={84} />
+            <Avatar nome={perfil.nome} fotoUrl={perfil.fotoUrl} tamanho={84} moldura={perfil.moldura} />
             <Text style={styles.nome}>
               {perfil.nome}
               {perfil.ehVoce ? ' (você)' : ''}
             </Text>
+            {perfil.titulo && <Text style={styles.tituloLoja}>{perfil.titulo}</Text>}
             <Text style={styles.nivel}>
               {nivel.titulo} · Nível {nivel.nivel}
             </Text>
@@ -117,6 +118,7 @@ const criarEstilos = (cores: Tema) =>
     topo: { alignItems: 'center', marginBottom: 16 },
     nome: { fontSize: 22, fontWeight: '800', color: cores.textPrimary, marginTop: 10 },
     nivel: { fontSize: 14, fontWeight: '700', color: cores.textSecondary, marginTop: 2 },
+    tituloLoja: { fontSize: 13, fontWeight: '800', color: cores.xpGold, marginTop: 4 },
     desde: { fontSize: 12, color: cores.textMuted, marginTop: 2 },
     numeros: {
       flexDirection: 'row',

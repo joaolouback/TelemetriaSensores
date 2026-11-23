@@ -118,6 +118,10 @@ export interface JogadorRanking {
   nome: string;
   pontuacaoTotal: number;
   fotoUrl: string | null;
+  /** Moldura da foto comprada na loja. */
+  moldura?: MolduraVisual | null;
+  /** Título comprado na loja. */
+  titulo?: string | null;
 }
 
 /** Resposta de `GET /api/ranking`. */
@@ -133,6 +137,8 @@ export interface PerfilJogador {
   id: number;
   nome: string;
   fotoUrl: string | null;
+  moldura?: MolduraVisual | null;
+  titulo?: string | null;
   pontuacaoTotal: number;
   posicao: number;
   membroDesde: string;
@@ -227,4 +233,41 @@ export interface PontoComDistancia extends PontoDeInteresse {
 export interface PontoTrajeto {
   latitude: number;
   longitude: number;
+}
+
+// ─── Loja de itens (`/api/loja`) ─────────────────────────────────────
+
+export type CategoriaItem = 'MOLDURA' | 'TEMA' | 'TITULO' | 'RASTRO';
+
+/** Como o item é desenhado (vem da API). */
+export interface VisualItem {
+  /** Moldura: cores do anel (uma = sólida; várias = segmentos). Rastro: cor da linha. Tema: amostra. */
+  cores?: string[];
+  brilho?: boolean;
+  /** Título: o texto exibido. */
+  texto?: string;
+}
+
+export interface MolduraVisual extends VisualItem {
+  codigo: string;
+}
+
+export interface ItemLoja {
+  codigo: string;
+  categoria: CategoriaItem;
+  nome: string;
+  descricao: string;
+  preco: number;
+  visual: VisualItem;
+  possui: boolean;
+  equipado: boolean;
+}
+
+export interface EstadoLoja {
+  /** Pontos disponíveis para gastar (o ranking continua usando a pontuação total). */
+  saldo: number;
+  pontuacaoTotal: number;
+  pontosGastos: number;
+  equipados: Record<CategoriaItem, string | null>;
+  itens: ItemLoja[];
 }

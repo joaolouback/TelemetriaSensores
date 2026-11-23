@@ -5,7 +5,7 @@
  * roda fora dos componentes e precisa do token e do id do usuário atual.
  */
 import { API_URL } from '../constants';
-import { Sessao } from '../types';
+import { Sessao, Usuario } from '../types';
 
 let sessaoAtual: Sessao | null = null;
 
@@ -43,6 +43,26 @@ async function postAuth(caminho: string, corpo: object): Promise<Sessao> {
   }
 
   return dados as Sessao;
+}
+
+/**
+ * Dados atuais do usuário logado (`GET /api/auth/me`). A sessão do aparelho guarda uma cópia
+ * feita no login; isto traz o que mudou no servidor desde então (pontos, foto...).
+ */
+export async function buscarUsuarioAtual(): Promise<Usuario> {
+  const token = getToken();
+  if (!token) throw new AuthError('Sem sessão.');
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    throw new AuthError('Sem conexão com o servidor.');
+  }
+
+  const dados = await response.json().catch(() => null);
+  if (!response.ok) throw new AuthError(dados?.error ?? `Erro inesperado (HTTP ${response.status}).`);
+  return dados as Usuario;
 }
 
 export function login(email: string, senha: string): Promise<Sessao> {

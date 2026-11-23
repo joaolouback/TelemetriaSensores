@@ -5,6 +5,7 @@
  * - Início (HomeScreen gamificada)
  * - Mapa (MapScreen em tema claro)
  * - Ranking (RankingScreen)
+ * - Loja (LojaScreen)
  * - Perfil (ProfileScreen)
  */
 import React, { useCallback, useMemo, useState } from 'react';
@@ -14,6 +15,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { RankingScreen } from '../screens/RankingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { LojaScreen } from '../screens/LojaScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { vibrarSelecao } from '../utils/vibracao';
 import { NavegacaoContext, PontoEmFoco } from '../contexts/NavegacaoContext';
@@ -23,7 +25,7 @@ import type { Tema } from '../constants/temas';
 /** Altura da barra de abas, sem contar a área da navegação do sistema. */
 const ALTURA_BARRA = 64;
 
-type Aba = 'inicio' | 'mapa' | 'ranking' | 'perfil';
+type Aba = 'inicio' | 'mapa' | 'ranking' | 'loja' | 'perfil';
 
 interface TabItem {
   id: Aba;
@@ -50,6 +52,12 @@ const TABS: TabItem[] = [
     label: 'Ranking',
     iconActive: 'trophy',
     iconInactive: 'trophy-outline',
+  },
+  {
+    id: 'loja',
+    label: 'Loja',
+    iconActive: 'storefront',
+    iconInactive: 'storefront-outline',
   },
   {
     id: 'perfil',
@@ -86,6 +94,9 @@ export function BottomTabs() {
       </View>
       <View style={[styles.tela, { bottom: alturaBarra }, aba !== 'ranking' && styles.escondida]} pointerEvents={aba === 'ranking' ? 'auto' : 'none'}>
         <RankingScreen />
+      </View>
+      <View style={[styles.tela, { bottom: alturaBarra }, aba !== 'loja' && styles.escondida]} pointerEvents={aba === 'loja' ? 'auto' : 'none'}>
+        <LojaScreen />
       </View>
       <View style={[styles.tela, { bottom: alturaBarra }, aba !== 'perfil' && styles.escondida]} pointerEvents={aba === 'perfil' ? 'auto' : 'none'}>
         <ProfileScreen />

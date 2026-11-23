@@ -16,11 +16,14 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import MapView, { Marker, Circle, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Circle, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useLiveLocation } from '../hooks/useLiveLocation';
 import { usePontos } from '../hooks/usePontos';
 import { useColetas } from '../hooks/useColetas';
 import { useAuth } from '../contexts/AuthContext';
+import { useLoja } from '../contexts/LojaContext';
+import { MarcadorJogador } from '../components/MarcadorJogador';
+import { MarcadorPonto, AreaPonto, EstadoPonto } from '../components/MarcadorPonto';
 import { Ionicons } from '@expo/vector-icons';
 import { vibrarSelecao } from '../utils/vibracao';
 import { useDesafio } from '../contexts/DesafioContext';
@@ -50,6 +53,7 @@ interface Props {
 export function MapScreen({ visivel }: Props) {
   const styles = useEstilos(criarEstilos);
   const { cores, escuro, barraStatus } = useTema();
+  const { corRastro, moldura } = useLoja();
   const insets = useSafeAreaInsets();
   /** Onde terminam o cabeçalho flutuante e começam os avisos (placar, geofence, erro). */
   const topoAlertas = insets.top + 92;
@@ -85,7 +89,7 @@ export function MapScreen({ visivel }: Props) {
   } = usePontos(localizacao);
 
   const { coletados, marcarColetado } = useColetas();
-  const { atualizarPontuacao } = useAuth();
+  const { usuario, atualizarPontuacao } = useAuth();
   const { desafio, pendentes, ajusteRelogio, atualizar: atualizarDesafio } = useDesafio();
   const desafioEmAndamento = desafio?.status === 'EM_ANDAMENTO' ? desafio : null;
   /** Ponto aberto na câmera de AR (null = câmera fechada). */
@@ -200,7 +204,6 @@ export function MapScreen({ visivel }: Props) {
         provider={PROVIDER_GOOGLE}
         customMapStyle={escuro ? MAP_DARK_STYLE : MAP_LIGHT_STYLE}
         initialRegion={REGIAO_INICIAL}
-        showsUserLocation
         showsMyLocationButton={false}
         showsCompass
         toolbarEnabled={false}
@@ -208,44 +211,34 @@ export function MapScreen({ visivel }: Props) {
       >
         {pontosComDistancia.map((ponto) => {
           const doDesafio = pendentes.has(ponto.id);
+          const coletado = coletados.has(ponto.id);
+          // Prioridade: desafio > dentro do raio > coletado > normal.
+          const estado: EstadoPonto = doDesafio
+            ? 'desafio'
+            : ponto.dentroDoRaio
+              ? 'noRaio'
+              : coletado
+                ? 'coletado'
+                : 'normal';
+          const cor = {
+            desafio: COR_DESAFIO,
+            noRaio: cores.success,
+            coletado: cores.xpGold,
+            normal: cores.discoverBlue,
+          }[estado];
           return (
             <React.Fragment key={ponto.id}>
-              <Circle
-                center={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-                radius={ponto.raioGeofence}
-                strokeWidth={doDesafio ? 3 : 2}
-                strokeColor={
-                  ponto.dentroDoRaio ? cores.success : doDesafio ? COR_DESAFIO : cores.discoverBlue
-                }
-                fillColor={
-                  ponto.dentroDoRaio
-                    ? 'rgba(16, 185, 129, 0.25)'
-                    : doDesafio
-                      ? 'rgba(249, 115, 22, 0.18)'
-                      : 'rgba(59, 91, 219, 0.12)'
-                }
-              />
-              <Marker
-                coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-                title={doDesafio ? `Desafio: ${ponto.nome}` : ponto.nome}
-                description={
+              <AreaPonto ponto={ponto} estado={estado} cor={cor} />
+              <MarcadorPonto
+                ponto={ponto}
+                estado={estado}
+                cor={cor}
+                titulo={doDesafio ? `Desafio: ${ponto.nome}` : ponto.nome}
+                descricao={
                   Number.isNaN(ponto.distanciaMetros)
                     ? ponto.descricao ?? ''
                     : `${formatDistancia(ponto.distanciaMetros)} · ` +
-                      (doDesafio
-                        ? 'ponto do desafio'
-                        : coletados.has(ponto.id)
-                          ? 'coletado ✓'
-                          : `${ponto.pontosRecompensa} pts`)
-                }
-                pinColor={
-                  doDesafio
-                    ? COR_DESAFIO
-                    : coletados.has(ponto.id)
-                      ? cores.xpGold
-                      : ponto.dentroDoRaio
-                        ? cores.success
-                        : cores.discoverBlue
+                      (doDesafio ? 'ponto do desafio' : coletado ? 'coletado ✓' : `${ponto.pontosRecompensa} pts`)
                 }
                 onPress={() => setPontoSelecionado(ponto)}
               />
@@ -253,18 +246,34 @@ export function MapScreen({ visivel }: Props) {
           );
         })}
 
-        {simulacao && (
-          <Marker
-            coordinate={{ latitude: simulacao.latitude, longitude: simulacao.longitude }}
-            title="Você (simulado)"
-            pinColor={cores.discoverPurple}
-          />
+        {/* O jogador: a foto de perfil no lugar do ponto azul (também no modo simulação). */}
+        {localizacao && (
+          <>
+            {!simulacao && localizacao.accuracy ? (
+              <Circle
+                center={{ latitude: localizacao.latitude, longitude: localizacao.longitude }}
+                radius={localizacao.accuracy}
+                strokeWidth={1}
+                strokeColor="rgba(59, 91, 219, 0.35)"
+                fillColor="rgba(59, 91, 219, 0.10)"
+              />
+            ) : null}
+            <MarcadorJogador
+              latitude={localizacao.latitude}
+              longitude={localizacao.longitude}
+              nome={usuario?.nome ?? ''}
+              fotoUrl={usuario?.fotoUrl}
+              moldura={moldura}
+              cor={simulacao ? cores.discoverPurple : cores.accent}
+              titulo={simulacao ? 'Você (simulado)' : 'Você'}
+            />
+          </>
         )}
 
         {trajeto.length > 1 && (
           <Polyline
             coordinates={trajeto}
-            strokeColor={cores.discoverBlue}
+            strokeColor={corRastro ?? cores.discoverBlue}
             strokeWidth={4}
           />
         )}

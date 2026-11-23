@@ -67,10 +67,12 @@ function Podio({
             )}
 
             {jogador ? (
-              <View style={[styles.podioFoto, { borderColor: cor }]}>
+              // Com moldura da loja, ela substitui o anel da cor do pódio.
+              <View style={[styles.podioFoto, { borderColor: cor }, jogador.moldura?.cores?.length ? { borderWidth: 0 } : null]}>
                 <Avatar
                   nome={jogador.nome}
                   fotoUrl={jogador.fotoUrl}
+                  moldura={jogador.moldura}
                   tamanho={TAMANHO_AVATAR[posicao]}
                   cor={cores.textMuted}
                 />
@@ -117,7 +119,7 @@ function Linha({ jogador, souEu, onAbrir }: { jogador: JogadorRanking; souEu: bo
       <Text style={styles.posicaoTexto}>{jogador.posicao}</Text>
 
       <View style={styles.avatar}>
-        <Avatar nome={jogador.nome} fotoUrl={jogador.fotoUrl} tamanho={36} />
+        <Avatar nome={jogador.nome} fotoUrl={jogador.fotoUrl} tamanho={36} moldura={jogador.moldura} />
       </View>
 
       <View style={styles.info}>
@@ -125,8 +127,12 @@ function Linha({ jogador, souEu, onAbrir }: { jogador: JogadorRanking; souEu: bo
           {jogador.nome}
           {souEu ? ' (você)' : ''}
         </Text>
-        <Text style={styles.nivel}>
-          Nível {nivel.nivel} · {nivel.titulo}
+        <Text style={styles.nivel} numberOfLines={1}>
+          {jogador.titulo ? (
+            <Text style={styles.tituloLoja}>{jogador.titulo} · </Text>
+          ) : null}
+          Nível {nivel.nivel}
+          {jogador.titulo ? '' : ` · ${nivel.titulo}`}
         </Text>
       </View>
 
@@ -423,6 +429,10 @@ const criarEstilos = (cores: Tema) => StyleSheet.create({
     fontSize: 12,
     color: cores.textSecondary,
     marginTop: 1,
+  },
+  tituloLoja: {
+    color: cores.xpGold,
+    fontWeight: '800',
   },
   pontos: {
     fontSize: 15,

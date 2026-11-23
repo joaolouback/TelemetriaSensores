@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { usePontos } from '../hooks/usePontos';
 import { useColetas } from '../hooks/useColetas';
+import { useLoja } from '../contexts/LojaContext';
 import { Avatar } from '../components/Avatar';
 import { DetalheLocal } from '../components/DetalheLocal';
 import { FolhaInferior } from '../components/FolhaInferior';
@@ -51,8 +52,9 @@ function getSaudacao(): string {
 export function HomeScreen() {
   const styles = useEstilos(criarEstilos);
   const { cores, barraStatus } = useTema();
+  const { moldura } = useLoja();
   const insets = useSafeAreaInsets();
-  const { usuario } = useAuth();
+  const { usuario, recarregarUsuario } = useAuth();
   const { pontos, recarregar: recarregarPontos } = usePontos(null);
   const { coletados, recarregarColetas } = useColetas();
   const { atualizar: atualizarDesafio } = useDesafio();
@@ -95,7 +97,7 @@ export function HomeScreen() {
   /** Puxar a tela para baixo recarrega pontos, coletas e desafio. */
   const atualizar = async () => {
     setAtualizando(true);
-    await Promise.allSettled([recarregarPontos(), recarregarColetas(), atualizarDesafio()]);
+    await Promise.allSettled([recarregarPontos(), recarregarColetas(), atualizarDesafio(), recarregarUsuario()]);
     setAtualizando(false);
   };
 
@@ -115,7 +117,7 @@ export function HomeScreen() {
             <Text style={styles.saudacao}>{getSaudacao()},</Text>
             <Text style={styles.nome}>{user.nome}</Text>
           </View>
-          <Avatar nome={usuario?.nome ?? ''} fotoUrl={usuario?.fotoUrl} tamanho={48} />
+          <Avatar nome={usuario?.nome ?? ''} fotoUrl={usuario?.fotoUrl} tamanho={48} moldura={moldura} />
         </View>
 
         {/* ─── Card Nível / XP ─── */}
